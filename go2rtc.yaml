@@ -1,0 +1,30 @@
+# go2rtc configuration for camview.
+# Docs: https://github.com/AlexxIT/go2rtc#configuration
+#
+# The ${...} values are expanded from environment variables at startup,
+# so the camera URL never has to be baked into the image.
+
+streams:
+  # The frontend connects to the stream named "camera".
+  # CAMERA_RTSP_URL example: rtsp://user:pass@192.168.1.50:554/stream1
+  camera: ${CAMERA_RTSP_URL}
+
+api:
+  # Internal API + signaling WebSocket. nginx reverse-proxies to this.
+  # Bound to localhost only; nginx is the public entry point.
+  listen: "127.0.0.1:1984"
+
+rtsp:
+  # Internal RTSP server (used by go2rtc for restreaming). Not exposed.
+  listen: "127.0.0.1:8554"
+
+webrtc:
+  # WebRTC media transport. Reachable via the mapped 8555 port in bridge mode.
+  listen: ":8555"
+  # NOTE: candidates are injected at runtime by entrypoint.sh *only* when the
+  # WEBRTC_CANDIDATE env var is set (e.g. "192.168.1.10:8555"). When it isn't,
+  # go2rtc can't advertise a browser-reachable address in bridge mode, so the
+  # player automatically falls back to MSE over the :8080 WebSocket. See README.
+
+log:
+  level: info

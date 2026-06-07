@@ -1,0 +1,23 @@
+services:
+  camview:
+    build: .
+    # Pre-built image option (after you push one): image: camview:latest
+    container_name: camview
+    restart: unless-stopped
+
+    # Bridge networking (Docker default) with explicit port mappings.
+    ports:
+      - "8080:8080"        # web UI + signaling WebSocket
+      - "8555:8555/tcp"    # WebRTC media (only used if WEBRTC_CANDIDATE is set)
+      - "8555:8555/udp"    # WebRTC media (only used if WEBRTC_CANDIDATE is set)
+
+    environment:
+      # REQUIRED — your camera's RTSP URL.
+      CAMERA_RTSP_URL: ${CAMERA_RTSP_URL}
+
+      # OPTIONAL — set to your server's LAN IP + WebRTC port to enable true
+      # WebRTC (lowest latency). If omitted, camview still works on :8080 using
+      # MSE (~1s latency). Example: "192.168.1.10:8555"
+      WEBRTC_CANDIDATE: ${WEBRTC_CANDIDATE:-}
+
+    # The UI is at http://<your-server-ip>:8080
