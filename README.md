@@ -138,11 +138,16 @@ latency instead of sub-second. For most home-camera use that's indistinguishable
 
   go2rtc prints the exact RTSP/ffmpeg error there.
 
-- **Video connects then freezes** — try the camera's sub-stream, or your camera
-  may use H.265/HEVC (most browsers can't play it over WebRTC). go2rtc will
-  transcode with the bundled ffmpeg; for that, change the stream line in
-  `go2rtc.yaml` to force H.264, e.g.
-  `camera: ffmpeg:${CAMERA_RTSP_URL}#video=h264`.
+- **High CPU usage** — by default camview transcodes to H.264 with ffmpeg so any
+  browser can play the feed (your camera may stream H.265/HEVC, which only Safari
+  supports). Transcoding only runs while someone is watching. To avoid it
+  entirely, point `CAMERA_RTSP_URL` at the camera's H.264 sub-stream and remove
+  the `ffmpeg:` line in `go2rtc.yaml`, or enable hardware transcoding (see the
+  comments in `go2rtc.yaml`).
+
+- **Video connects then freezes / black screen on a non-Safari browser** —
+  usually means the H.264 transcode isn't being produced. Check the container
+  logs for ffmpeg errors.
 
 - **Black screen, no errors** — a WebRTC reachability problem. Either unset
   `WEBRTC_CANDIDATE` to fall back to MSE over :8080, or make sure the candidate

@@ -7,7 +7,24 @@
 streams:
   # The frontend connects to the stream named "camera".
   # CAMERA_RTSP_URL example: rtsp://user:pass@192.168.1.50:554/stream1
-  camera: ${CAMERA_RTSP_URL}
+  #
+  # Two sources are listed:
+  #   1. The raw camera feed (used as-is by clients that support its codec,
+  #      e.g. Safari with H.265/HEVC).
+  #   2. An on-demand ffmpeg transcode to H.264 video + AAC/Opus audio, so
+  #      every other browser can play it over MSE and WebRTC. This only runs
+  #      while someone is watching, and go2rtc copies (no re-encode) when the
+  #      camera already sends H.264.
+  #
+  # For zero-CPU operation, point CAMERA_RTSP_URL at your camera's H.264
+  # sub-stream instead and you can drop the second (ffmpeg) line.
+  #
+  # Hardware transcoding: append a flag to the ffmpeg line, e.g.
+  #   ffmpeg:camera#video=h264#hardware=vaapi#audio=aac#audio=opus   (Intel/AMD)
+  #   ffmpeg:camera#video=h264#hardware=cuda#audio=aac#audio=opus     (NVIDIA)
+  camera:
+    - ${CAMERA_RTSP_URL}
+    - ffmpeg:camera#video=h264#audio=aac#audio=opus
 
 api:
   # Internal API + signaling WebSocket. nginx reverse-proxies to this.
