@@ -46,6 +46,12 @@
             object-fit: contain;
         }
 
+        /* Hide native playback controls (we want a clean live view). */
+        video-stream video::-webkit-media-controls,
+        video-stream video::-webkit-media-controls-enclosure {
+            display: none !important;
+        }
+
         /* Top bar overlay */
         #bar {
             position: fixed;
@@ -206,6 +212,8 @@
             if (!player.video) return;
             clearInterval(watch);
             const v = player.video;
+            v.removeAttribute('controls');   // video-rtc.js enables them by default
+            v.controls = false;
             v.addEventListener('playing', () => setState('live', 'live'));
             v.addEventListener('waiting', () => setState('connecting', 'buffering…'));
             v.addEventListener('stalled', () => setState('connecting', 'reconnecting…'));
