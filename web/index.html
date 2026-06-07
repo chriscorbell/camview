@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0b0d10">
+    <title>camview</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%23e5484d'/></svg>">
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #0b0d10;
+            --fg: #e8eaed;
+            --muted: #9aa0a6;
+            --accent: #e5484d;
+            --ok: #30a46c;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0;
+            height: 100%;
+            background: var(--bg);
+            color: var(--fg);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        #stage {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+        }
+
+        video-stream {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        video-stream video {
+            object-fit: contain;
+        }
+
+        /* Top bar overlay */
+        #bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 18px;
+            padding-top: max(14px, env(safe-area-inset-top));
+            background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+            pointer-events: none;
+            z-index: 10;
+            transition: opacity 0.4s ease;
+        }
+
+        body.idle #bar { opacity: 0; }
+
+        #title {
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            font-size: 15px;
+        }
+
+        #status {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        #dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--muted);
+            box-shadow: 0 0 0 0 rgba(48, 163, 108, 0.6);
+        }
+
+        #dot.live {
+            background: var(--ok);
+            animation: pulse 2s infinite;
+        }
+
+        #dot.error { background: var(--accent); }
+
+        @keyframes pulse {
+            0%   { box-shadow: 0 0 0 0 rgba(48, 163, 108, 0.5); }
+            70%  { box-shadow: 0 0 0 7px rgba(48, 163, 108, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(48, 163, 108, 0); }
+        }
+
+        /* Centered overlay for connecting / error states */
+        #overlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            text-align: center;
+            padding: 24px;
+            z-index: 5;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        #overlay.hidden { opacity: 0; }
+
+        .spinner {
+            width: 44px;
+            height: 44px;
+            border: 3px solid rgba(255, 255, 255, 0.15);
+            border-top-color: var(--fg);
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        #overlay-text {
+            font-size: 15px;
+            color: var(--muted);
+            max-width: 32ch;
+            line-height: 1.5;
+        }
+
+        #overlay.error .spinner { display: none; }
+        #overlay.error #overlay-text { color: var(--fg); }
+
+        .err-detail {
+            font-size: 13px;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="stage">
+        <video-stream id="player"></video-stream>
+    </div>
+
+    <div id="bar">
+        <span id="title">camview</span>
+        <span id="status"><span id="dot"></span><span id="status-text">connecting…</span></span>
+    </div>
+
+    <div id="overlay">
+        <div class="spinner"></div>
+        <div id="overlay-text">Connecting to camera…</div>
+    </div>
+
+    <script type="module">
+        import { VideoRTC } from './video-rtc.js';
+
+        customElements.define('video-stream', VideoRTC);
+
+        const player = document.getElementById('player');
+        const dot = document.getElementById('dot');
+        const statusText = document.getElementById('status-text');
+        const overlay = document.getElementById('overlay');
+        const overlayText = document.getElementById('overlay-text');
+
+        // Stream name is fixed to the one defined in go2rtc.yaml ("camera").
+        const STREAM = 'camera';
+
+        // Prefer the lowest-latency transport; fall back automatically.
+        player.mode = 'webrtc,mse,hls,mjpeg';
+        player.background = false;
+
+        function setState(state, text, detail) {
+            statusText.textContent = text;
+            dot.className = '';
+            if (state === 'live') {
+                dot.classList.add('live');
+                overlay.classList.add('hidden');
+                overlay.classList.remove('error');
+            } else if (state === 'error') {
+                dot.classList.add('error');
+                overlay.classList.remove('hidden');
+                overlay.classList.add('error');
+                overlayText.innerHTML = text +
+                    (detail ? `<div class="err-detail">${detail}</div>` : '');
+            } else {
+                overlay.classList.remove('hidden', 'error');
+                overlayText.textContent = text;
+            }
+        }
+
+        // The component dispatches readiness via the underlying <video> element.
+        player.addEventListener('loadeddata', () => setState('live', 'live'), { once: false });
+
+        // Watch the inner <video> once it exists.
+        const watch = setInterval(() => {
+            if (!player.video) return;
+            clearInterval(watch);
+            const v = player.video;
+            v.addEventListener('playing', () => setState('live', 'live'));
+            v.addEventListener('waiting', () => setState('connecting', 'buffering…'));
+            v.addEventListener('stalled', () => setState('connecting', 'reconnecting…'));
+        }, 100);
+
+        // Surface WebSocket failures (e.g. go2rtc down or bad camera URL).
+        let errTimer = setTimeout(() => {
+            if (!player.video || player.video.readyState < 2) {
+                setState('error', 'Cannot reach the camera stream.',
+                    'Check that CAMERA_RTSP_URL is correct and the camera is online. See container logs for go2rtc errors.');
+            }
+        }, 12000);
+        player.addEventListener('loadeddata', () => clearTimeout(errTimer), { once: true });
+
+        // Point the player at the signaling endpoint (proxied by nginx → go2rtc).
+        player.src = `/api/ws?src=${STREAM}`;
+
+        // Auto-hide the top bar when the mouse is idle.
+        let idleTimer;
+        function poke() {
+            document.body.classList.remove('idle');
+            clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => document.body.classList.add('idle'), 3000);
+        }
+        ['mousemove', 'touchstart', 'keydown'].forEach(e => window.addEventListener(e, poke));
+        poke();
+
+        // Double-click / double-tap to toggle fullscreen.
+        document.getElementById('stage').addEventListener('dblclick', () => {
+            if (document.fullscreenElement) document.exitFullscreen();
+            else document.documentElement.requestFullscreen().catch(() => {});
+        });
+    </script>
+</body>
+</html>
