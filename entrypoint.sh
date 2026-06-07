@@ -15,19 +15,51 @@ mkdir -p /tmp/nginx-client /tmp/nginx-proxy /tmp/nginx-fastcgi /tmp/nginx-uwsgi 
 # Forward termination signals to children for clean shutdown.
 trap 'kill -TERM "$go2rtc_pid" "$nginx_pid" 2>/dev/null; exit 0' TERM INT
 
-# In bridge mode go2rtc can't auto-detect a browser-reachable address. If the
-# operator supplied one, inject it as an additional inline config (go2rtc merges
-# multiple -config args). Otherwise the player falls back to MSE over :8080.
-if [ -n "$WEBRTC_CANDIDATE" ]; then
-    echo "[camview] advertising WebRTC candidate: $WEBRTC_CANDIDATE"
-    candidate_cfg="{\"webrtc\":{\"candidates\":[\"$WEBRTC_CANDIDATE\"]}}"
-else
-    echo "[camview] WEBRTC_CANDIDATE not set — WebRTC will fall back to MSE over :8080 (still low latency)."
-    candidate_cfg=""
-fi
+# The "camera" stream is generated from env vars at runtime and merged with the
+# baked-in static config (go2rtc deep-merges multiple -config files). This is
+# what lets the GHCR image run with ONLY compose + .env — no go2rtc.yaml on the
+# host. Tunable via:
+#   CAMERA_RTSP_URL  (required) the camera source
+#   TRANSCODE        h264 (default) | off   — "off" passes the feed through as-is
+#   HWACCEL          (optional) vaapi | cuda | qsv | ...  — GPU for the transcode
+#   WEBRTC_CANDIDATE (optional) "<lan-ip>:8555" to enable true WebRTC
+#
+# We write the ${CAMERA_RTSP_URL} / ${WEBRTC_CANDIDATE} placeholders into a FILE
+# (not an inline -config string, which go2rtc does NOT env-expand). go2rtc then
+# expands them at load time AND masks them as "***" in /api/streams, so the
+# camera credentials are never exposed to anyone who can reach :8080/api/.
+gen=/tmp/camview-stream.yaml
+{
+    echo "streams:"
+    echo "  camera:"
+    echo "    - \${CAMERA_RTSP_URL}"
+    case "$(printf '%s' "${TRANSCODE:-h264}" | tr '[:upper:]' '[:lower:]')" in
+        off|none|no|false|0)
+            echo "[camview] transcoding disabled — passing the camera stream through unchanged." >&2
+            ;;
+        *)
+            if [ -n "$HWACCEL" ]; then
+                hw="#hardware=$HWACCEL"
+                echo "[camview] H.264 transcode with hardware acceleration: $HWACCEL" >&2
+            else
+                hw=""
+                echo "[camview] H.264 transcode (software). Set HWACCEL=vaapi|cuda|qsv for GPU offload." >&2
+            fi
+            echo "    - ffmpeg:camera#video=h264${hw}#audio=aac#audio=opus"
+            ;;
+    esac
+    if [ -n "$WEBRTC_CANDIDATE" ]; then
+        echo "[camview] advertising WebRTC candidate: $WEBRTC_CANDIDATE" >&2
+        echo "webrtc:"
+        echo "  candidates:"
+        echo "    - \${WEBRTC_CANDIDATE}"
+    else
+        echo "[camview] WEBRTC_CANDIDATE not set — WebRTC will fall back to MSE over :8080 (still low latency)." >&2
+    fi
+} > "$gen"
 
 echo "[camview] starting go2rtc…"
-go2rtc -config /config/go2rtc.yaml ${candidate_cfg:+-config "$candidate_cfg"} &
+go2rtc -config /config/go2rtc.yaml -config "$gen" &
 go2rtc_pid=$!
 
 echo "[camview] starting nginx on :8080…"
