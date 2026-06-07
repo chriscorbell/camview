@@ -45,7 +45,7 @@ HWACCEL=vaapi
 
 Notes:
 - **WebRTC vs MSE:** with bridge networking the container can't auto-detect a browser-reachable IP, so WebRTC needs `WEBRTC_CANDIDATE`. Without it, the player uses MSE over port 8080 — fine for most camera viewing, but higher latency than WebRTC
-- **Hardware transcode:** set `HWACCEL` *and* pass the GPU through in `compose.yaml` (see the comments in dev.compose.yaml)
+- **Hardware transcode:** set `HWACCEL` *and* pass the GPU through in `compose.yaml` (see the comments in `dev.compose.yaml`)
 - Find your RTSP URL in the camera's app/manual; test it with `ffprobe "<url>"`
 - LAN-only, no auth. **Don't expose to the internet**, use a VPN for remote access
 
