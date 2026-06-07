@@ -1,7 +1,10 @@
 services:
   camview:
-    build: .
-    # Pre-built image option (after you push one): image: camview:latest
+    # Pre-built multi-arch image from GitHub Container Registry.
+    # Pin a version instead of :latest if you prefer, e.g. :v1.0.0
+    image: ghcr.io/chriscorbell/camview:latest
+    # To build locally from source instead, comment out `image:` above and
+    # uncomment: build: .
     container_name: camview
     restart: unless-stopped
 
@@ -20,15 +23,22 @@ services:
       # MSE (~1s latency). Example: "192.168.1.10:8555"
       WEBRTC_CANDIDATE: ${WEBRTC_CANDIDATE:-}
 
-    # --- Hardware transcoding (optional) ---------------------------------------
-    # Two pieces are required together:
-    #   1) the GPU passthrough below, AND
-    #   2) the matching `#hardware=...` flag on the ffmpeg line in go2rtc.yaml.
-    # Pick the block for your GPU and uncomment it.
+      # OPTIONAL — "h264" (default) transcodes so any browser can play the feed;
+      # "off" passes the camera through unchanged (use with an H.264 sub-stream).
+      TRANSCODE: ${TRANSCODE:-h264}
+
+      # OPTIONAL — offload the H.264 transcode to a GPU. Leave empty for software.
+      # Values: vaapi (Intel/AMD), cuda (NVIDIA), qsv, etc. Requires the matching
+      # GPU passthrough below (and, for NVIDIA, the two NVIDIA_* vars).
+      HWACCEL: ${HWACCEL:-}
+
+    # --- Hardware transcoding passthrough (optional) ---------------------------
+    # Set HWACCEL above AND uncomment the block for your GPU below. No edits to
+    # any file inside the image are needed.
     #
-    # Intel / AMD (VAAPI / QuickSync) — go2rtc line: ...#hardware=vaapi...
-    #   Works with the ffmpeg bundled in the image. The container needs access
-    #   to the render node; `render`/`video` below must match the GID that owns
+    # Intel / AMD (VAAPI / QuickSync) — set HWACCEL=vaapi
+    #   Works with the ffmpeg bundled in the image. The container needs access to
+    #   the render node; `render`/`video` must match the GID that owns
     #   /dev/dri/renderD128 on your host (run: `ls -n /dev/dri`).
     # devices:
     #   - /dev/dri:/dev/dri
@@ -36,7 +46,7 @@ services:
     #   - "video"
     #   - "render"
     #
-    # NVIDIA (NVENC / CUDA) — go2rtc line: ...#hardware=cuda...
+    # NVIDIA (NVENC / CUDA) — set HWACCEL=cuda
     #   Requires the NVIDIA Container Toolkit installed on the host. Add these
     #   two vars to the `environment:` block ABOVE (don't add a second one):
     #     NVIDIA_VISIBLE_DEVICES: all

@@ -1,30 +1,19 @@
-# go2rtc configuration for camview.
+# go2rtc base configuration for camview.
 # Docs: https://github.com/AlexxIT/go2rtc#configuration
 #
-# The ${...} values are expanded from environment variables at startup,
-# so the camera URL never has to be baked into the image.
-
-streams:
-  # The frontend connects to the stream named "camera".
-  # CAMERA_RTSP_URL example: rtsp://user:pass@192.168.1.50:554/stream1
-  #
-  # Two sources are listed:
-  #   1. The raw camera feed (used as-is by clients that support its codec,
-  #      e.g. Safari with H.265/HEVC).
-  #   2. An on-demand ffmpeg transcode to H.264 video + AAC/Opus audio, so
-  #      every other browser can play it over MSE and WebRTC. This only runs
-  #      while someone is watching, and go2rtc copies (no re-encode) when the
-  #      camera already sends H.264.
-  #
-  # For zero-CPU operation, point CAMERA_RTSP_URL at your camera's H.264
-  # sub-stream instead and you can drop the second (ffmpeg) line.
-  #
-  # Hardware transcoding: append a flag to the ffmpeg line, e.g.
-  #   ffmpeg:camera#video=h264#hardware=vaapi#audio=aac#audio=opus   (Intel/AMD)
-  #   ffmpeg:camera#video=h264#hardware=cuda#audio=aac#audio=opus     (NVIDIA)
-  camera:
-    - ${CAMERA_RTSP_URL}
-    - ffmpeg:camera#video=h264#audio=aac#audio=opus
+# This file holds only the static settings (listen addresses, log level). The
+# "camera" stream itself is generated at runtime by entrypoint.sh from these
+# environment variables and merged in, so the GHCR image needs NO go2rtc.yaml on
+# the host — just compose + .env:
+#
+#   CAMERA_RTSP_URL   (required)  e.g. rtsp://user:pass@192.168.1.50:554/stream1
+#   TRANSCODE         h264 (default) | off    "off" = pass the feed through as-is
+#   HWACCEL           (optional)  vaapi | cuda | qsv | ...  GPU for the transcode
+#   WEBRTC_CANDIDATE  (optional)  "<lan-ip>:8555" to enable true WebRTC
+#
+# By default the stream exposes the raw camera feed PLUS an on-demand ffmpeg
+# transcode to H.264/AAC/Opus, so every browser can play it (Safari can still
+# use native HEVC). The transcode only runs while someone is watching.
 
 api:
   # Internal API + signaling WebSocket. nginx reverse-proxies to this.

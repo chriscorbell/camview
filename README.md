@@ -18,44 +18,33 @@ browser ──HTTP/WS──▶ nginx :8080 ──▶ go2rtc :1984 (signaling)
 - The web UI auto-connects, auto-reconnects, shows a live/offline indicator, and
   supports double-click fullscreen.
 
-## Quick start (Docker Compose)
+## Quick start (Docker Compose + GHCR image)
 
-1. Find your camera's RTSP URL (see [examples](#finding-your-rtsp-url)).
-2. Configure it:
+You only need **two files** on your server: `docker-compose.yml` and `.env`.
+The compose file already points at the pre-built multi-arch image on GHCR
+(`ghcr.io/chriscorbell/camview`, rebuilt on every push to `main`), so there's
+nothing to build and **no `go2rtc.yaml` to manage** — all configuration is env vars.
+
+1. Grab `docker-compose.yml` and `.env.example` from this repo.
+2. Find your camera's RTSP URL (see [examples](#finding-your-rtsp-url)) and set it:
 
    ```sh
    cp .env.example .env
    # edit .env and set CAMERA_RTSP_URL
    ```
 
-3. Build and run:
+3. Start it:
 
    ```sh
-   docker compose up -d --build
+   docker compose up -d
    ```
 
 4. Open **http://<your-server-ip>:8080** in a browser.
 
+> The GHCR package may be private; if `docker compose up` can't pull, either make
+> the package public or run `docker login ghcr.io` first.
+
 ## Quick start (plain Docker)
-
-```sh
-docker build -t camview .
-
-docker run -d --name camview --restart unless-stopped \
-  -p 8080:8080 -p 8555:8555/tcp -p 8555:8555/udp \
-  -e CAMERA_RTSP_URL="rtsp://user:pass@192.168.1.50:554/stream1" \
-  -e WEBRTC_CANDIDATE="192.168.1.10:8555" \
-  camview
-```
-
-Then open http://<your-server-ip>:8080
-
-(`WEBRTC_CANDIDATE` is optional — see [Networking](#networking) below.)
-
-## Run the pre-built image (GHCR)
-
-Every push to `main` publishes a multi-arch image (amd64 + arm64) to the GitHub
-Container Registry, so you can skip the build step on your server:
 
 ```sh
 docker run -d --name camview --restart unless-stopped \
@@ -64,15 +53,25 @@ docker run -d --name camview --restart unless-stopped \
   ghcr.io/chriscorbell/camview:latest
 ```
 
-Or point Compose at it by setting `image: ghcr.io/chriscorbell/camview:latest`
-in `docker-compose.yml` (and removing the `build: .` line).
+Then open http://<your-server-ip>:8080
+
+(`WEBRTC_CANDIDATE` is optional — see [Networking](#networking) below.)
+
+## Build from source instead
+
+Prefer to build locally? Comment out `image:` in `docker-compose.yml`, uncomment
+`build: .`, then `docker compose up -d --build` — or `docker build -t camview .`.
 
 ## Configuration
 
-| Variable            | Required | Description                                                                 |
-| ------------------- | -------- | --------------------------------------------------------------------------- |
-| `CAMERA_RTSP_URL`   | yes      | Full RTSP URL of your camera, including credentials.                        |
-| `WEBRTC_CANDIDATE`  | no       | `"<server-lan-ip>:8555"` to enable true WebRTC. Unset → MSE fallback.       |
+All configuration is via environment variables (put them in `.env`):
+
+| Variable            | Required | Default | Description                                                              |
+| ------------------- | -------- | ------- | ------------------------------------------------------------------------ |
+| `CAMERA_RTSP_URL`   | yes      | —       | Full RTSP URL of your camera, including credentials.                     |
+| `WEBRTC_CANDIDATE`  | no       | —       | `"<server-lan-ip>:8555"` to enable true WebRTC. Unset → MSE fallback.    |
+| `TRANSCODE`         | no       | `h264`  | `h264` transcodes so any browser plays it; `off` passes the feed as-is.  |
+| `HWACCEL`           | no       | —       | Offload the transcode to a GPU: `vaapi`, `cuda`, `qsv`, … (see below).   |
 
 ### Finding your RTSP URL
 
@@ -140,10 +139,10 @@ latency instead of sub-second. For most home-camera use that's indistinguishable
 
 - **High CPU usage** — by default camview transcodes to H.264 with ffmpeg so any
   browser can play the feed (your camera may stream H.265/HEVC, which only Safari
-  supports). Transcoding only runs while someone is watching. To avoid it
-  entirely, point `CAMERA_RTSP_URL` at the camera's H.264 sub-stream and remove
-  the `ffmpeg:` line in `go2rtc.yaml`, or enable hardware transcoding (see the
-  comments in `go2rtc.yaml`).
+  supports). Transcoding only runs while someone is watching. To reduce it: set
+  `HWACCEL` to offload to a GPU (see [Hardware transcoding](#hardware-transcoding)),
+  or point `CAMERA_RTSP_URL` at the camera's H.264 sub-stream and set
+  `TRANSCODE=off`.
 
 - **Video connects then freezes / black screen on a non-Safari browser** —
   usually means the H.264 transcode isn't being produced. Check the container
@@ -157,6 +156,31 @@ latency instead of sub-second. For most home-camera use that's indistinguishable
   `http://<server-ip>:8080/api/` endpoints; visiting `/api/streams` shows stream
   status as JSON.
 
+## Hardware transcoding
+
+Transcoding HEVC→H.264 in software uses CPU. To offload it to a GPU, set
+`HWACCEL` **and** give the container access to the GPU in `docker-compose.yml`
+(both halves are required). No files inside the image need editing.
+
+**Intel / AMD (VAAPI / QuickSync)** — works with the bundled ffmpeg:
+
+```yaml
+# .env
+HWACCEL=vaapi
+```
+```yaml
+# docker-compose.yml (under the camview service) — uncomment:
+devices:
+  - /dev/dri:/dev/dri
+group_add: ["video", "render"]   # must match the GID owning /dev/dri/renderD128
+```
+
+**NVIDIA (NVENC / CUDA)** — set `HWACCEL=cuda`, install the NVIDIA Container
+Toolkit on the host, and uncomment the `deploy:` GPU block plus add
+`NVIDIA_VISIBLE_DEVICES=all` / `NVIDIA_DRIVER_CAPABILITIES=all`. See the comments
+in `docker-compose.yml`. (NVENC may require a go2rtc image variant with
+NVIDIA-enabled ffmpeg; check the logs for ffmpeg errors if `cuda` fails.)
+
 ## Security note
 
 camview has no authentication and is meant for a trusted LAN. Do **not** expose
@@ -165,12 +189,20 @@ VPN (e.g. Tailscale/WireGuard) or an authenticating reverse proxy.
 
 ## Files
 
+Files baked into the image (you don't need these on the server):
+
+| File                 | Purpose                                                       |
+| -------------------- | ------------------------------------------------------------- |
+| `Dockerfile`         | Builds the single image (go2rtc + nginx + UI).                |
+| `go2rtc.yaml`        | Static base config only; the stream is generated from env vars. |
+| `entrypoint.sh`      | Generates the stream config from env vars, supervises both procs. |
+| `nginx.conf`         | Serves the UI, proxies signaling WebSocket.                   |
+| `web/index.html`     | The camview frontend.                                         |
+| `web/video-rtc.js`   | Vendored go2rtc WebRTC player (auto-reconnect).               |
+
+Files you actually deploy with:
+
 | File                 | Purpose                                            |
 | -------------------- | -------------------------------------------------- |
-| `Dockerfile`         | Builds the single image (go2rtc + nginx + UI).     |
-| `go2rtc.yaml`        | Stream + WebRTC config (reads env vars).            |
-| `nginx.conf`         | Serves the UI, proxies signaling WebSocket.         |
-| `entrypoint.sh`      | Starts and supervises both processes.               |
-| `web/index.html`     | The camview frontend.                               |
-| `web/video-rtc.js`   | Vendored go2rtc WebRTC player (auto-reconnect).      |
-| `docker-compose.yml` | Convenience wrapper.                                 |
+| `docker-compose.yml` | References the GHCR image; sets ports + env.        |
+| `.env`               | Your camera URL and options (from `.env.example`).  |
