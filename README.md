@@ -59,14 +59,26 @@ browser ──HTTP/WS :8080──▶ nginx ──▶ go2rtc :1984 (signaling)
 
 - **[go2rtc](https://github.com/AlexxIT/go2rtc)** — pulls the RTSP stream and serves it as WebRTC/MSE; runs the on-demand ffmpeg H.264 transcode
 - **nginx** — serves the static UI and reverse-proxies the signaling WebSocket, so everything is on one port
-- **`web/`** — the frontend; `video-rtc.js` is go2rtc's vendored player
+- **Vite + React + TypeScript** — the frontend lives in `src/` and builds to static assets
+- **`src/vendor/video-rtc.js`** — go2rtc's vendored browser player, with local TypeScript declarations in `src/vendor/video-rtc.d.ts`
 - **`entrypoint.sh`** — generates the `camera` stream config from the env vars at startup (kept in a file so go2rtc expands *and* masks the credentialed URL), then runs go2rtc + nginx
 
 Everything lives in one image; `go2rtc.yaml` holds only static base settings.
 
 ```sh
+npm install
+npm run dev                       # Vite dev server
+npm run build                     # type-check + production frontend build
 docker build -t camview .          # build locally
 docker compose up -d --build       # or via compose (uncomment `build:` first)
 ```
+
+For local UI development, Vite proxies `/api` WebSocket traffic to go2rtc. By default it targets `http://127.0.0.1:1984`; override it when developing against a running camview container:
+
+```sh
+VITE_GO2RTC_ORIGIN=http://127.0.0.1:8080 npm run dev
+```
+
+The Docker build compiles the Vite app in a Node stage, then copies `dist/` into the final go2rtc/nginx image.
 
 CI (`.github/workflows/docker-publish.yml`) builds a multi-arch image (amd64 + arm64) and pushes the image to GHCR
