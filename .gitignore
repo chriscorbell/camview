@@ -9,3 +9,7 @@
 *~
 .idea/
 .vscode/
+
+# JS build output / dependencies
+dist/
+node_modules/

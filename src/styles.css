@@ -1,0 +1,182 @@
+:root {
+  color-scheme: dark;
+  --accent: #e5484d;
+  --bg: #0b0d10;
+  --fg: #e8eaed;
+  --muted: #9aa0a6;
+  --ok: #30a46c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  overflow: hidden;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.app {
+  height: 100%;
+  min-height: 100%;
+}
+
+.stage {
+  align-items: center;
+  background: #000;
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  position: fixed;
+}
+
+.player-host,
+video-stream {
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+
+video-stream video {
+  object-fit: contain;
+}
+
+video-stream video::-webkit-media-controls,
+video-stream video::-webkit-media-controls-enclosure {
+  display: none !important;
+}
+
+.bar {
+  align-items: center;
+  background: linear-gradient(to bottom, rgb(0 0 0 / 55%), rgb(0 0 0 / 0%));
+  display: flex;
+  gap: 10px;
+  left: 0;
+  padding: 14px 18px;
+  padding-top: max(14px, env(safe-area-inset-top));
+  pointer-events: none;
+  position: fixed;
+  right: 0;
+  top: 0;
+  transition: opacity 0.4s ease;
+  z-index: 10;
+}
+
+.idle .bar {
+  opacity: 0;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.status {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 13px;
+  gap: 7px;
+}
+
+.dot {
+  background: var(--muted);
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgb(48 163 108 / 60%);
+  height: 9px;
+  width: 9px;
+}
+
+.dot.live {
+  animation: pulse 2s infinite;
+  background: var(--ok);
+}
+
+.dot.error {
+  background: var(--accent);
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(48 163 108 / 50%);
+  }
+
+  70% {
+    box-shadow: 0 0 0 7px rgb(48 163 108 / 0%);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgb(48 163 108 / 0%);
+  }
+}
+
+.overlay {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  pointer-events: none;
+  position: fixed;
+  text-align: center;
+  transition: opacity 0.3s ease;
+  z-index: 5;
+}
+
+.overlay.hidden {
+  opacity: 0;
+}
+
+.spinner {
+  animation: spin 0.9s linear infinite;
+  border: 3px solid rgb(255 255 255 / 15%);
+  border-radius: 50%;
+  border-top-color: var(--fg);
+  height: 44px;
+  width: 44px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.overlay-text {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.5;
+  max-width: 32ch;
+}
+
+.overlay.error .spinner {
+  display: none;
+}
+
+.overlay.error .overlay-text {
+  color: var(--fg);
+}
+
+.err-detail {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 4px;
+}
