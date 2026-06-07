@@ -1,50 +1,15 @@
 # camview
 
-A dead-simple, single-container live viewer for an RTSP IP camera. Open it in a
-browser and it auto-connects to your camera and shows the feed with **sub-second
-latency** over WebRTC.
+Single-container live viewer for an RTSP IP camera. Open it in a browser and it
+auto-connects and shows the feed with sub-second latency over WebRTC (with an
+automatic MSE fallback). Non-H.264 cameras are transcoded on the fly so any
+browser can play them.
 
-```
-browser ──HTTP/WS──▶ nginx :8080 ──▶ go2rtc :1984 (signaling)
-   ▲                                      │
-   └──────────── WebRTC media :8555 ◀─────┘  ◀── RTSP from your camera
-```
+## Run it
 
-- **go2rtc** does the heavy lifting: it pulls the camera's RTSP stream and
-  remuxes the H.264 video into WebRTC (no re-encoding when the codec is already
-  browser-compatible, which keeps latency low and CPU usage tiny).
-- **nginx** serves the camview web UI and proxies the signaling WebSocket, so
-  everything is reachable on one port.
-- The web UI auto-connects, auto-reconnects, shows a live/offline indicator, and
-  supports double-click fullscreen.
+Needs only a `CAMERA_RTSP_URL`. The image is on GHCR — nothing to build.
 
-## Quick start (Docker Compose + GHCR image)
-
-You only need **two files** on your server: `docker-compose.yml` and `.env`.
-The compose file already points at the pre-built multi-arch image on GHCR
-(`ghcr.io/chriscorbell/camview`, rebuilt on every push to `main`), so there's
-nothing to build and **no `go2rtc.yaml` to manage** — all configuration is env vars.
-
-1. Grab `docker-compose.yml` and `.env.example` from this repo.
-2. Find your camera's RTSP URL (see [examples](#finding-your-rtsp-url)) and set it:
-
-   ```sh
-   cp .env.example .env
-   # edit .env and set CAMERA_RTSP_URL
-   ```
-
-3. Start it:
-
-   ```sh
-   docker compose up -d
-   ```
-
-4. Open **http://<your-server-ip>:8080** in a browser.
-
-> The GHCR package may be private; if `docker compose up` can't pull, either make
-> the package public or run `docker login ghcr.io` first.
-
-## Quick start (plain Docker)
+**docker run:**
 
 ```sh
 docker run -d --name camview --restart unless-stopped \
@@ -53,156 +18,56 @@ docker run -d --name camview --restart unless-stopped \
   ghcr.io/chriscorbell/camview:latest
 ```
 
-Then open http://<your-server-ip>:8080
-
-(`WEBRTC_CANDIDATE` is optional — see [Networking](#networking) below.)
-
-## Build from source instead
-
-Prefer to build locally? Comment out `image:` in `docker-compose.yml`, uncomment
-`build: .`, then `docker compose up -d --build` — or `docker build -t camview .`.
-
-## Configuration
-
-All configuration is via environment variables (put them in `.env`):
-
-| Variable            | Required | Default | Description                                                              |
-| ------------------- | -------- | ------- | ------------------------------------------------------------------------ |
-| `CAMERA_RTSP_URL`   | yes      | —       | Full RTSP URL of your camera, including credentials.                     |
-| `WEBRTC_CANDIDATE`  | no       | —       | `"<server-lan-ip>:8555"` to enable true WebRTC. Unset → MSE fallback.    |
-| `TRANSCODE`         | no       | `h264`  | `h264` transcodes so any browser plays it; `off` passes the feed as-is.  |
-| `HWACCEL`           | no       | —       | Offload the transcode to a GPU: `vaapi`, `cuda`, `qsv`, … (see below).   |
-
-### Finding your RTSP URL
-
-Most cameras follow a fixed pattern. Replace `user`, `pass`, and the IP:
-
-| Brand     | RTSP URL                                                                        |
-| --------- | ------------------------------------------------------------------------------- |
-| Reolink   | `rtsp://user:pass@IP:554/h264Preview_01_main` (or `_sub` for the low-res feed)  |
-| Hikvision | `rtsp://user:pass@IP:554/Streaming/Channels/101`                                |
-| Dahua     | `rtsp://user:pass@IP:554/cam/realmonitor?channel=1&subtype=0`                   |
-| Amcrest   | `rtsp://user:pass@IP:554/cam/realmonitor?channel=1&subtype=0`                   |
-| Generic   | `rtsp://user:pass@IP:554/stream1`                                               |
-
-Not sure? Test the URL first with VLC (*File → Open Network Stream*) or:
+**docker compose** — copy `docker-compose.yml` + `.env.example` to your server:
 
 ```sh
-ffprobe "rtsp://user:pass@IP:554/stream1"
+cp .env.example .env   # set CAMERA_RTSP_URL
+docker compose up -d
 ```
 
-Tip: use the camera's **sub/low-res stream** for the smoothest experience on
-phones and remote connections.
+Then open **http://<server-ip>:8080**.
 
-## Networking
+### Configuration (env vars)
 
-camview runs in **bridge networking** (Docker's default) with these ports:
+| Variable           | Default | Description                                                            |
+| ------------------ | ------- | ---------------------------------------------------------------------- |
+| `CAMERA_RTSP_URL`  | —       | **Required.** Full RTSP URL incl. credentials.                        |
+| `WEBRTC_CANDIDATE` | —       | `"<server-lan-ip>:8555"` for true WebRTC; unset falls back to MSE.    |
+| `TRANSCODE`        | `h264`  | `off` to pass the feed through (use with a native H.264 sub-stream).   |
+| `HWACCEL`          | —       | GPU offload for the transcode: `vaapi`, `cuda`, `qsv`, …               |
 
-- **8080** — web UI + signaling WebSocket (TCP). The only port strictly required.
-- **8555** — WebRTC media (TCP + UDP). Only used when WebRTC is enabled.
+Notes:
+- **WebRTC vs MSE:** with bridge networking the container can't auto-detect a
+  browser-reachable IP, so WebRTC (sub-second) needs `WEBRTC_CANDIDATE`. Without
+  it, the player uses MSE over port 8080 (~1s) — fine for most camera viewing.
+- **Hardware transcode:** set `HWACCEL` *and* pass the GPU through in
+  `docker-compose.yml` (see the commented blocks there).
+- Find your RTSP URL in the camera's app/manual; test it with `ffprobe "<url>"`.
+- LAN-only, no auth. Don't expose to the internet — use a VPN for remote access.
 
-There are two transport modes, and the player picks the best one automatically:
+## Tech stack & development
 
-| Mode             | When                                   | Latency | Needs                         |
-| ---------------- | -------------------------------------- | ------- | ----------------------------- |
-| **WebRTC**       | `WEBRTC_CANDIDATE` is set              | <1s     | 8080 **and** 8555 reachable   |
-| **MSE** (fallback) | `WEBRTC_CANDIDATE` unset / WebRTC fails | ~1s     | 8080 only                     |
+```
+browser ──HTTP/WS :8080──▶ nginx ──▶ go2rtc :1984 (signaling)
+   ▲                                     │
+   └─────────── WebRTC media :8555 ◀─────┘  ◀── RTSP from camera
+```
 
-**Why the candidate is needed for WebRTC.** In a bridge network the container
-only sees its internal `172.x` address, which your browser can't reach. go2rtc
-has no way to guess your server's real LAN IP, so you tell it via
-`WEBRTC_CANDIDATE`. Find your server's LAN IP with:
+- **[go2rtc](https://github.com/AlexxIT/go2rtc)** — pulls the RTSP stream and
+  serves it as WebRTC/MSE; runs the on-demand ffmpeg H.264 transcode.
+- **nginx** — serves the static UI and reverse-proxies the signaling WebSocket,
+  so everything is on one port.
+- **`web/`** — the frontend; `video-rtc.js` is go2rtc's vendored player.
+- **`entrypoint.sh`** — generates the `camera` stream config from the env vars at
+  startup (kept in a file so go2rtc expands *and* masks the credentialed URL),
+  then runs go2rtc + nginx.
+
+Everything lives in one image; `go2rtc.yaml` holds only static base settings.
 
 ```sh
-ip route get 1 | awk '{print $7; exit}'      # Linux
-# then set WEBRTC_CANDIDATE=<that-ip>:8555
+docker build -t camview .          # build locally
+docker compose up -d --build       # or via compose (uncomment `build:` first)
 ```
 
-If you skip it, everything still works over port 8080 via MSE — just ~1s of
-latency instead of sub-second. For most home-camera use that's indistinguishable.
-
-> Prefer the old zero-config behaviour? You can still run with `--network host`
-> (or `network_mode: host` in compose) and leave `WEBRTC_CANDIDATE` unset — go2rtc
-> will auto-discover the LAN IP. Bridge mode is now the default for better
-> isolation and portability.
-
-## Troubleshooting
-
-- **"Cannot reach the camera stream" overlay** — the camera URL is likely wrong
-  or the camera is unreachable. Check the logs:
-
-  ```sh
-  docker compose logs -f      # or: docker logs -f camview
-  ```
-
-  go2rtc prints the exact RTSP/ffmpeg error there.
-
-- **High CPU usage** — by default camview transcodes to H.264 with ffmpeg so any
-  browser can play the feed (your camera may stream H.265/HEVC, which only Safari
-  supports). Transcoding only runs while someone is watching. To reduce it: set
-  `HWACCEL` to offload to a GPU (see [Hardware transcoding](#hardware-transcoding)),
-  or point `CAMERA_RTSP_URL` at the camera's H.264 sub-stream and set
-  `TRANSCODE=off`.
-
-- **Video connects then freezes / black screen on a non-Safari browser** —
-  usually means the H.264 transcode isn't being produced. Check the container
-  logs for ffmpeg errors.
-
-- **Black screen, no errors** — a WebRTC reachability problem. Either unset
-  `WEBRTC_CANDIDATE` to fall back to MSE over :8080, or make sure the candidate
-  IP is your server's real LAN IP and ports 8555/tcp + 8555/udp are mapped.
-
-- **go2rtc's own diagnostics** — the full go2rtc dashboard is proxied at
-  `http://<server-ip>:8080/api/` endpoints; visiting `/api/streams` shows stream
-  status as JSON.
-
-## Hardware transcoding
-
-Transcoding HEVC→H.264 in software uses CPU. To offload it to a GPU, set
-`HWACCEL` **and** give the container access to the GPU in `docker-compose.yml`
-(both halves are required). No files inside the image need editing.
-
-**Intel / AMD (VAAPI / QuickSync)** — works with the bundled ffmpeg:
-
-```yaml
-# .env
-HWACCEL=vaapi
-```
-```yaml
-# docker-compose.yml (under the camview service) — uncomment:
-devices:
-  - /dev/dri:/dev/dri
-group_add: ["video", "render"]   # must match the GID owning /dev/dri/renderD128
-```
-
-**NVIDIA (NVENC / CUDA)** — set `HWACCEL=cuda`, install the NVIDIA Container
-Toolkit on the host, and uncomment the `deploy:` GPU block plus add
-`NVIDIA_VISIBLE_DEVICES=all` / `NVIDIA_DRIVER_CAPABILITIES=all`. See the comments
-in `docker-compose.yml`. (NVENC may require a go2rtc image variant with
-NVIDIA-enabled ffmpeg; check the logs for ffmpeg errors if `cuda` fails.)
-
-## Security note
-
-camview has no authentication and is meant for a trusted LAN. Do **not** expose
-port 8080/8555 directly to the internet. To access it remotely, put it behind a
-VPN (e.g. Tailscale/WireGuard) or an authenticating reverse proxy.
-
-## Files
-
-Files baked into the image (you don't need these on the server):
-
-| File                 | Purpose                                                       |
-| -------------------- | ------------------------------------------------------------- |
-| `Dockerfile`         | Builds the single image (go2rtc + nginx + UI).                |
-| `go2rtc.yaml`        | Static base config only; the stream is generated from env vars. |
-| `entrypoint.sh`      | Generates the stream config from env vars, supervises both procs. |
-| `nginx.conf`         | Serves the UI, proxies signaling WebSocket.                   |
-| `web/index.html`     | The camview frontend.                                         |
-| `web/video-rtc.js`   | Vendored go2rtc WebRTC player (auto-reconnect).               |
-
-Files you actually deploy with:
-
-| File                 | Purpose                                            |
-| -------------------- | -------------------------------------------------- |
-| `docker-compose.yml` | References the GHCR image; sets ports + env.        |
-| `.env`               | Your camera URL and options (from `.env.example`).  |
+CI (`.github/workflows/docker-publish.yml`) builds a multi-arch image
+(amd64 + arm64) and pushes to GHCR on every push to `main` and on `v*` tags.
