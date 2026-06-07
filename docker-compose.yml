@@ -20,4 +20,34 @@ services:
       # MSE (~1s latency). Example: "192.168.1.10:8555"
       WEBRTC_CANDIDATE: ${WEBRTC_CANDIDATE:-}
 
+    # --- Hardware transcoding (optional) ---------------------------------------
+    # Two pieces are required together:
+    #   1) the GPU passthrough below, AND
+    #   2) the matching `#hardware=...` flag on the ffmpeg line in go2rtc.yaml.
+    # Pick the block for your GPU and uncomment it.
+    #
+    # Intel / AMD (VAAPI / QuickSync) — go2rtc line: ...#hardware=vaapi...
+    #   Works with the ffmpeg bundled in the image. The container needs access
+    #   to the render node; `render`/`video` below must match the GID that owns
+    #   /dev/dri/renderD128 on your host (run: `ls -n /dev/dri`).
+    # devices:
+    #   - /dev/dri:/dev/dri
+    # group_add:
+    #   - "video"
+    #   - "render"
+    #
+    # NVIDIA (NVENC / CUDA) — go2rtc line: ...#hardware=cuda...
+    #   Requires the NVIDIA Container Toolkit installed on the host. Add these
+    #   two vars to the `environment:` block ABOVE (don't add a second one):
+    #     NVIDIA_VISIBLE_DEVICES: all
+    #     NVIDIA_DRIVER_CAPABILITIES: all
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu, video]
+    # ---------------------------------------------------------------------------
+
     # The UI is at http://<your-server-ip>:8080
