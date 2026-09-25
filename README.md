@@ -23,6 +23,8 @@ services:
     environment:
       CAMERA_RTSP_URL: ${CAMERA_RTSP_URL}
       WEBRTC_CANDIDATE: ${WEBRTC_CANDIDATE:-}
+      TRANSCODE: ${TRANSCODE:-h264}
+      HWACCEL: ${HWACCEL:-}
 ```
 
 Create a `.env` file in the same directory as `compose.yaml` (see `.env.example` for more details):
@@ -31,7 +33,7 @@ Create a `.env` file in the same directory as `compose.yaml` (see `.env.example`
 CAMERA_RTSP_URL=rtsp://user:pass@192.168.1.50:554/stream1
 WEBRTC_CANDIDATE=192.168.1.10:8555
 TRANSCODE=h264
-HWACCEL=vaapi
+# HWACCEL=vaapi
 ```
 
 ### env vars
@@ -41,11 +43,11 @@ HWACCEL=vaapi
 | `CAMERA_RTSP_URL`  | —       | **Required.** Full RTSP URL incl. credentials.                        |
 | `WEBRTC_CANDIDATE` | —       | `"<server-lan-ip>:8555"` for true WebRTC; unset falls back to MSE.    |
 | `TRANSCODE`        | `h264`  | `off` to pass the feed through (use with a native H.264 sub-stream).   |
-| `HWACCEL`          | —       | GPU offload for the transcode: `vaapi`, `cuda`, `qsv`, …               |
+| `HWACCEL`          | —       | GPU offload for the transcode: `vaapi` (Intel/AMD, incl. QuickSync) or `cuda` (NVIDIA). |
 
 Notes:
 - **WebRTC vs MSE:** with bridge networking the container can't auto-detect a browser-reachable IP, so WebRTC needs `WEBRTC_CANDIDATE`. Without it, the player uses MSE over port 8080 — fine for most camera viewing, but higher latency than WebRTC
-- **Hardware transcode:** set `HWACCEL` *and* pass the GPU through in `compose.yaml` (see the comments in `dev.compose.yaml`)
+- **Hardware transcode:** set `HWACCEL` *and* pass the GPU through in `compose.yaml` (see the comments in `dev.compose.yaml`). go2rtc ignores values it doesn't recognize, so anything else quietly runs on the CPU
 - Find your RTSP URL in the camera's app/manual; test it with `ffprobe "<url>"`
 - LAN-only, no auth. **Don't expose to the internet**, use a VPN for remote access
 
