@@ -21,7 +21,7 @@ trap 'kill -TERM "$go2rtc_pid" "$nginx_pid" 2>/dev/null; exit 0' TERM INT
 # host. Tunable via:
 #   CAMERA_RTSP_URL  (required) the camera source
 #   TRANSCODE        h264 (default) | off   — "off" passes the feed through as-is
-#   HWACCEL          (optional) vaapi | cuda | qsv | ...  — GPU for the transcode
+#   HWACCEL          (optional) vaapi | cuda  — GPU for the transcode
 #   WEBRTC_CANDIDATE (optional) "<lan-ip>:8555" to enable true WebRTC
 #
 # We write the ${CAMERA_RTSP_URL} / ${WEBRTC_CANDIDATE} placeholders into a FILE
@@ -43,7 +43,7 @@ gen=/tmp/camview-stream.yaml
                 echo "[camview] H.264 transcode with hardware acceleration: $HWACCEL" >&2
             else
                 hw=""
-                echo "[camview] H.264 transcode (software). Set HWACCEL=vaapi|cuda|qsv for GPU offload." >&2
+                echo "[camview] H.264 transcode (software). Set HWACCEL=vaapi|cuda for GPU offload." >&2
             fi
             echo "    - ffmpeg:camera#video=h264${hw}#audio=aac#audio=opus"
             ;;

@@ -28,7 +28,7 @@ services:
       TRANSCODE: ${TRANSCODE:-h264}
 
       # OPTIONAL — offload the H.264 transcode to a GPU. Leave empty for software.
-      # Values: vaapi (Intel/AMD), cuda (NVIDIA), qsv, etc. Requires the matching
+      # Values: vaapi (Intel/AMD, including QuickSync) or cuda (NVIDIA). Requires the matching
       # GPU passthrough below (and, for NVIDIA, the two NVIDIA_* vars).
       HWACCEL: ${HWACCEL:-}
 
