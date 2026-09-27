@@ -1,0 +1,165 @@
+:root {
+  color-scheme: dark;
+  --fg: rgb(255 255 255 / 0.92);
+  --glass: rgb(18 18 20 / 0.55);
+  --glass-hover: rgb(44 44 48 / 0.7);
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  font: 500 14px/1.2 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+}
+
+.stage {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.stage:not(.awake) {
+  cursor: none;
+}
+
+.feed,
+.freeze {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.freeze {
+  pointer-events: none;
+  opacity: 0;
+  filter: brightness(0.4) saturate(0.6);
+  transition: opacity 500ms var(--ease-out);
+}
+
+.stage[data-state='reconnecting'] .freeze {
+  opacity: 1;
+  transition-duration: 0ms;
+}
+
+/* The label waits a beat, so quick blips and fast first frames never flash it. */
+.status {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.6em 1.05em 0.6em 0.9em;
+  border-radius: 999px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  color: var(--fg);
+  letter-spacing: 0.01em;
+  opacity: 0;
+  transform: translateY(4px) scale(0.98);
+  transition:
+    opacity 220ms var(--ease-out),
+    transform 220ms var(--ease-out);
+}
+
+.status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.stage[data-state='connecting'] .status,
+.stage[data-state='reconnecting'] .status {
+  opacity: 1;
+  transform: none;
+  transition-delay: 450ms;
+}
+
+.controls {
+  position: absolute;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  display: flex;
+  gap: 8px;
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition:
+    opacity 240ms var(--ease-out),
+    transform 240ms var(--ease-out);
+}
+
+.stage.awake .controls {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  transition-duration: 160ms;
+}
+
+.controls button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  color: var(--fg);
+  cursor: pointer;
+  transition:
+    background 150ms var(--ease-out),
+    transform 150ms var(--ease-out);
+}
+
+.controls button:hover {
+  background: var(--glass-hover);
+}
+
+.controls button:active {
+  transform: scale(0.93);
+}
+
+.controls button:focus-visible {
+  outline: 2px solid rgb(255 255 255 / 0.75);
+  outline-offset: 2px;
+}
+
+.controls svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.75;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before {
+    transition-duration: 0ms !important;
+    transition-delay: 0ms !important;
+    animation: none !important;
+  }
+}

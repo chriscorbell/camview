@@ -1,0 +1,82 @@
+# Every push to main ships: CI publishes ghcr.io/chriscorbell/camview:latest,
+# and Watchtower on minicore picks it up within about a minute. Roll back by
+# pinning a :sha-<commit> tag in the compose file.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+  relay:
+    needs: web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: camview:ci
+          cache-from: type=gha
+      # The Relay must serve the viewer and the WebRTC endpoint, and nothing else.
+      - name: Smoke test
+        run: |
+          docker run -d --name relay -p 8080:8080 \
+            -e MAIN_STREAM_URL=rtsp://127.0.0.1:1/none -e SUB_STREAM_URL=rtsp://127.0.0.1:1/none \
+            -e LAN_ADDRESS=127.0.0.1 -e TAILSCALE_ADDRESS=127.0.0.1 camview:ci
+          for i in $(seq 20); do curl -fs -o /dev/null http://127.0.0.1:8080/ && break; sleep 0.5; done
+          code() { curl -s -o /dev/null -w '%{http_code}' -X "$1" "http://127.0.0.1:8080$2"; }
+          test "$(code GET /)" = 200
+          test "$(code POST /api/webrtc?src=feed)" != 404
+          for path in /api /api/streams /api/config /api/ws /api/restart /stream.html; do
+            test "$(code GET "$path")" = 404 || { echo "$path is exposed"; exit 1; }
+          done
+
+  publish:
+    if: github.event_name == 'push'
+    needs: relay
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/chriscorbell/camview:latest
+            ghcr.io/chriscorbell/camview:sha-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

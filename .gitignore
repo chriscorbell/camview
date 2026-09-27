@@ -1,15 +1,4 @@
-# Secrets — never commit your real camera URL / credentials.
-.env
-.env.*
-!.env.example
-
-# OS / editor cruft
-.DS_Store
-*.swp
-*~
-.idea/
-.vscode/
-
-# JS build output / dependencies
-dist/
 node_modules/
+dist/
+.env
+.DS_Store

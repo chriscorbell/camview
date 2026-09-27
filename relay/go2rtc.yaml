@@ -1,0 +1,37 @@
+# camview Relay. go2rtc is the only process in the container: it serves the
+# web viewer and hands the Feed to every Viewer over WebRTC.
+# ${VARS} are expanded by go2rtc at startup; see compose.yaml.
+
+api:
+  listen: ":8080"
+  static_dir: /usr/share/camview
+  # Only the viewer page and WebRTC signaling exist. go2rtc's own UI, config
+  # editor, restart, and stream listing are never registered.
+  allow_paths: [/, /api/webrtc]
+
+streams:
+  # Browsers get the Main stream untouched. A Viewer that can't play H.265
+  # gets the Sub stream instead: go2rtc picks, per Viewer, the first source
+  # whose codec that Viewer offered. The Camera sends AAC, which WebRTC can't
+  # play, so the last source converts only the audio to Opus.
+  feed:
+    - ${MAIN_STREAM_URL}
+    - ${SUB_STREAM_URL}
+    - ffmpeg:feed#audio=opus
+
+rtsp:
+  # Internal only: go2rtc's ffmpeg sources publish back through it.
+  listen: "127.0.0.1:8554"
+
+webrtc:
+  listen: ":8555"
+  # In bridge networking go2rtc can't see the host's addresses, so advertise
+  # the ones Viewers can actually reach: the LAN, and Tailscale for away.
+  candidates:
+    - ${LAN_ADDRESS}:8555
+    - ${TAILSCALE_ADDRESS}:8555
+  # Every Viewer reaches a candidate directly; skipping STUN keeps answers fast.
+  ice_servers: []
+
+log:
+  level: info

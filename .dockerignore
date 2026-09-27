@@ -1,9 +1,5 @@
-.git
-.env
-.env.*
-!.env.example
-*.md
-docker-compose.yml
-.dockerignore
-dist
-node_modules
+*
+!relay/
+!web/
+web/node_modules/
+web/dist/
