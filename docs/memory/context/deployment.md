@@ -4,15 +4,16 @@ Read when: deploying, updating, or checking the running camview, changing its po
 Status: verified
 Scope: environment (production host `server`)
 Verified: 2026-09-27
-Source: read-only inspection of the server on 2026-09-27. Raw output was not kept; this note summarizes it. Host facts are kept in Chris's private infrastructure notes.
+Source: inspection of the server and the cutover on 2026-09-27. Raw output was not kept; this note summarizes it. Host facts are kept in Chris's private infrastructure notes.
 Recheck when: the rebuild or any later change alters the image, compose file, env file, ports, network, exposure, or the host's GPU or drivers.
 
 ## Container
 
-- Runs as container `camview` from `ghcr.io/chriscorbell/camview:latest`.
-- Compose file: `<stacks>/camview/compose.yaml`.
-- Env file: `<data>/camview/.env`, holding `CAMERA_RTSP_URL` and `WEBRTC_CANDIDATE`. It contains credentials: read single keys when needed and never copy values into the repo or memory.
-- Bridge network. Published ports: 3147 (UI) and 8555 TCP and UDP (WebRTC).
+- Runs as container `camview` from `ghcr.io/chriscorbell/camview:latest` (the go2rtc-only Relay since 2026-09-27, PR #3). Watchtower on the server polls GHCR every 60 s and recreates it when `:latest` moves, reusing the running container's config, not the compose file. Change env on the running container (compose `up -d`) before merging anything that needs new env.
+- Compose file: `<stacks>/camview/compose.yaml`, matching the repo's `compose.yaml`. The config is inline env with no secrets: Frigate's restream needs no credentials. The pre-rebuild compose is kept as `compose.yaml.bak-2026-09-27` next to it.
+- `<data>/camview/.env` is no longer used. It still holds the old `CAMERA_RTSP_URL` with Camera credentials; never copy its values anywhere.
+- `/dev/dri` is passed through with `group_add: "991"` (render), for the `desk` stream's VAAPI conversion. It was added to the running container before the Desk display PR (#4) merged.
+- Bridge network. Published ports: 3147→8080 (viewer and signaling) and 8555 TCP and UDP (WebRTC). WebRTC candidates are `192.168.1.20:8555` and `100.64.0.20:8555`, both verified end to end on 2026-09-27; the Tailscale path was forced by stripping the LAN candidate.
 
 ## Exposure
 

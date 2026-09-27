@@ -1,13 +1,15 @@
 # camview Relay. go2rtc is the only process in the container: it serves the
-# web viewer and hands the Feed to every Viewer over WebRTC.
+# web viewer, hands the Feed to browsers over WebRTC, and hands the Desk
+# display its own 1080p stream over HTTP.
 # ${VARS} are expanded by go2rtc at startup; see compose.yaml.
 
 api:
   listen: ":8080"
   static_dir: /usr/share/camview
-  # Only the viewer page and WebRTC signaling exist. go2rtc's own UI, config
-  # editor, restart, and stream listing are never registered.
-  allow_paths: [/, /api/webrtc]
+  # Only the viewer page, WebRTC signaling, and the Desk display's stream
+  # exist. go2rtc's own UI, config editor, restart, and stream listing are never
+  # registered, and the patched go2rtc plays only the streams below.
+  allow_paths: [/, /api/webrtc, /api/stream.mp4]
 
 streams:
   # Browsers get the Main stream untouched. A Viewer that can't play H.265
@@ -18,6 +20,28 @@ streams:
     - ${MAIN_STREAM_URL}
     - ${SUB_STREAM_URL}
     - ffmpeg:feed#audio=opus
+
+  # The Desk display can't decode 4K, so it gets the Main stream scaled to
+  # 1080p on the GPU, with the Camera's own audio alongside.
+  desk:
+    - ffmpeg:feed#input=desk/input#video=desk/h264
+    - rtsp://127.0.0.1:8554/feed?audio
+
+ffmpeg:
+  desk/input: >-
+    -init_hw_device vaapi=gpu:/dev/dri/renderD128 -filter_hw_device gpu
+    -hwaccel vaapi -hwaccel_device gpu -hwaccel_output_format vaapi -hwaccel_flags allow_profile_mismatch
+    -fflags nobuffer -flags low_delay -timeout {timeout} -user_agent go2rtc/ffmpeg
+    -rtsp_flags prefer_tcp -i {input}
+  # The Camera stamps frames when it sends them, so the timestamps bunch up
+  # after every Keyframe stall. Left alone, ffmpeg would repeat and drop frames
+  # to even them out. setpts re-times them to the 25 fps the Camera actually
+  # captures, one output frame per input frame. async_depth 1 and no B-frames
+  # keep the encoder from holding frames back.
+  desk/h264: >-
+    -vf setpts=N/(25*TB),format=vaapi|nv12,hwupload,scale_vaapi=w=1920:h=1080:format=nv12:out_color_matrix=bt709:out_range=tv
+    -r 25 -c:v h264_vaapi -async_depth:v 1 -bf:v 0 -g:v 50 -profile:v high -level:v 4.1 -sei:v 0
+    -rc_mode:v CBR -b:v 6M -maxrate:v 6M -bufsize:v 3M
 
 rtsp:
   # Internal only: go2rtc's ffmpeg sources publish back through it.
