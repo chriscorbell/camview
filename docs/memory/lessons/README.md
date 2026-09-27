@@ -9,4 +9,4 @@ Threshold: 12 entries. Past it, the bounded review in [maintenance](../maintenan
 ## Notes
 
 - [VAAPI transcoding inside go2rtc](vaapi-transcode-in-go2rtc.md): read when the Desk display gets audio but no video, or when changing the `desk` stream, the ffmpeg templates, or the GPU passthrough.
-- [Desk display decoder contention](tablet-decoder-contention.md): read when the tablet app crashes starting video, MediaCodec reports NO_MEMORY, or debug logs are missing on the tablet.
+- [Desk display decoder contention and launcher quirks](tablet-decoder-contention.md): read when the tablet app crashes starting video, MediaCodec reports NO_MEMORY, debug logs are missing, Home opens a picker or the stock launcher, or a "•••" handle covers the Feed.

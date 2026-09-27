@@ -39,9 +39,11 @@ Each push to `main` that changes `android/` publishes a signed APK as a GitHub r
 adb install camview-desk.apk
 adb shell cmd package set-home-activity com.chriscorbell.camview/.MainActivity
 adb shell appops set com.chriscorbell.camview REQUEST_INSTALL_PACKAGES allow
+adb install -r -i com.chriscorbell.camview camview-desk.apk   # makes the app its own installer, so updates never need a tap
+adb shell settings put system enable_temp_zuifreeformbar 0     # Lenovo only: hides the multi-window handle drawn over the top
 ```
 
-From then on the app checks GitHub Releases every 15 minutes and updates itself. Android asks for confirmation on the first self-update only. The server address is set in [`android/app/build.gradle.kts`](android/app/build.gradle.kts).
+From then on the app checks GitHub Releases every 15 minutes, updates itself, and reopens the feed. The server address is set in [`android/app/build.gradle.kts`](android/app/build.gradle.kts).
 
 ## Develop
 
