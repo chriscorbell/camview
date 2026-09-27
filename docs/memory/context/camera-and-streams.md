@@ -55,7 +55,7 @@ Values before the change:
 
 ## Checks
 
-Never write credentials into memory; use `<user>:<pass>` placeholders in anything you save.
+Never write credentials into memory; use `<user>:<pass>` placeholders in anything you save. The Camera's user is `admin`. Its password lives only in Frigate's container environment as `FRIGATE_RTSP_PASSWORD` on minicore; pipe it where it's needed (for example `ssh minicore 'docker exec frigate printenv FRIGATE_RTSP_PASSWORD'`) and never print it.
 
 - Codec, resolution, frame rate, audio: `ffprobe -v error -rtsp_transport tcp -show_streams "rtsp://<user>:<pass>@10.0.0.200:554/h264Preview_01_main"`, and the same for `h264Preview_01_sub`.
 - Open ports: `nmap -Pn -p- 10.0.0.200`.
