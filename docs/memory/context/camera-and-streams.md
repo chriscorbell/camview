@@ -39,7 +39,7 @@ Measured 2026-09-27, in daylight with a mostly static scene, before the keyframe
 - The Sub stream stalls about the same, roughly 0.3 s, because its keyframes share the sender with the Main stream's.
 - UDP is only somewhat faster than TCP. The limit is the Camera's sender, not TCP and not the encoder.
 
-**After the 2026-09-27 changes** (I-frame interval 1x on both streams, fixed frame rate on), measured through the Relay: the stall is 0.20–0.25 s, once per second.
+**After the 2026-09-27 changes** (I-frame interval 1x on both streams, fixed frame rate on), measured through the Relay: the stall is 0.20–0.25 s, once per second. Frigate's recordings stayed at about 6.3 Mbps before and after (VBR sits at its cap), keyframes went from 0.5 to 1 per second, and a crop compare of brick texture showed no visible loss.
 
 ## Encoder settings (via ONVIF and Baichuan)
 
