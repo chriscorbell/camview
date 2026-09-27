@@ -1,37 +1,20 @@
-# camview - single-container RTSP to WebRTC live camera viewer.
-#
-# Built on the official go2rtc image (Alpine + go2rtc binary + ffmpeg),
-# with nginx added to serve the camview frontend and proxy WebRTC signaling.
-FROM node:24-alpine AS web-build
+FROM node:24-alpine AS web
+WORKDIR /web
+RUN corepack enable
+COPY web/package.json web/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY web/ ./
+RUN pnpm build
 
-WORKDIR /app
+FROM alexxit/go2rtc:1.9.14 AS go2rtc
 
-COPY package.json package-lock.json ./
-RUN npm ci
-
-COPY index.html tsconfig.json vite.config.ts ./
-COPY src/ ./src/
-RUN npm run build
-
-FROM alexxit/go2rtc:latest
-
-USER root
-
-RUN apk add --no-cache nginx \
-    && rm -rf /var/cache/apk/*
-
-# go2rtc config (reads CAMERA_RTSP_URL / WEBRTC_CANDIDATE from env at runtime).
-COPY go2rtc.yaml /config/go2rtc.yaml
-
-# nginx config + compiled static frontend.
-COPY nginx.conf /etc/nginx/nginx.conf
-COPY --from=web-build /app/dist/ /var/www/camview/
-
-# Process supervisor.
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-# 8080 = web UI + signaling (HTTP/WS). 8555 = WebRTC media (TCP+UDP).
+# The Relay: go2rtc alone, plus ffmpeg for the audio conversion.
+FROM alpine:3.23
+RUN apk add --no-cache ffmpeg tini \
+    && adduser -S -D -H camview
+COPY --from=go2rtc /usr/local/bin/go2rtc /usr/local/bin/go2rtc
+COPY relay/go2rtc.yaml /etc/camview/go2rtc.yaml
+COPY --from=web /web/dist /usr/share/camview
+USER camview
 EXPOSE 8080 8555/tcp 8555/udp
-
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/sbin/tini", "--", "go2rtc", "-config", "/etc/camview/go2rtc.yaml"]

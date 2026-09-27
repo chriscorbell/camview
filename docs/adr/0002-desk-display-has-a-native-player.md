@@ -1,0 +1,3 @@
+# The Desk display has its own native player instead of reusing the web page
+
+Wrapping the web viewer in a WebView would give one player for every **Viewer**, but the **Desk display** is a budget tablet (MediaTek Helio G88 class, 4 GB RAM) running around the clock. A WebView costs a full Chromium engine, composites every frame through a weak GPU, and adds WebRTC's jitter buffer. A native player that hands the **Feed** straight to the hardware decoder and a SurfaceView avoids all three. That makes it lighter, faster, and lower-latency, at the cost of maintaining a second player. We accepted that cost because the **Desk display** is the **Viewer** that runs 24/7.
