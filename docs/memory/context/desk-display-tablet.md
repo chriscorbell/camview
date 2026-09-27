@@ -22,7 +22,7 @@ Lenovo Tab M11 (TB330FU), MediaTek MT8786 (`mt6768`, Helio G88 class), Android 1
 
 ## The installed app
 
-The release app `com.chriscorbell.camview` is installed from `desk-3` (2026-09-27). It is the default home activity (`cmd package set-home-activity com.chriscorbell.camview/com.chriscorbell.camview.MainActivity`), has `REQUEST_INSTALL_PACKAGES` granted with appops, and is its own installer of record, which is what allows silent self-updates. `adb install -i <pkg>` only takes effect once the package already exists, so install once and then reinstall with `-r -i com.chriscorbell.camview`. The Reolink app is also on the tablet; see the lesson on decoder contention.
+The release app `com.chriscorbell.camview` is installed from `desk-3` (2026-09-27). It is the default home activity (`cmd package set-home-activity com.chriscorbell.camview/com.chriscorbell.camview.MainActivity`), has `REQUEST_INSTALL_PACKAGES` granted with appops, and is its own installer of record, which is what allows silent self-updates. `adb install -i <pkg>` only takes effect once the package already exists, so install once and then reinstall with `-r -i com.chriscorbell.camview`. The Lenovo freeform bar is off (`settings put system enable_temp_zuifreeformbar 0`). The Reolink app is also on the tablet; see the lesson on decoder contention. Self-update is verified end to end (desk-3 → 5 → 7), with no tap needed, and the Feed reopens after each update.
 
 ## Access
 
