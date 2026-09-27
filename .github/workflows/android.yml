@@ -1,6 +1,7 @@
 # The Desk display app. Every push to main that touches android/ publishes a
-# signed release tagged desk-<run number>. The app on the tablet checks GitHub
-# Releases every 15 minutes and installs anything newer by itself.
+# signed release tagged desk-<run number>, and so does running this workflow by
+# hand on main. The app on the tablet checks GitHub Releases every 15 minutes
+# and installs anything newer by itself.
 name: Android
 
 on:
@@ -9,6 +10,7 @@ on:
   push:
     branches: [main]
     paths: [android/**, .github/workflows/android.yml]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -34,7 +36,7 @@ jobs:
         run: ./gradlew --no-daemon assembleDebug assembleRelease lint
 
   release:
-    if: github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     permissions:

@@ -17,7 +17,7 @@ Reolink RLC-820A at `10.0.0.200`, firmware v3.1.0.5223_2508072063. Only ports 55
 | --- | --- | --- |
 | RTSP path | `h264Preview_01_main` | `h264Preview_01_sub` |
 | Video | HEVC Main L5.0, 3840x2160, 25 fps, ~7 Mbps | H.264 High, 640x360, ~10 fps, ~220 kbps |
-| Keyframe interval | ~2 s | ~4 s |
+| Keyframe interval | 1 s (was 2 s until 2026-09-27) | 1 s (was 4 s until 2026-09-27) |
 | Audio | AAC-LC 16 kHz mono | AAC-LC 16 kHz mono |
 
 The Main stream path says `h264` but carries HEVC; judge the codec from a probe, never from the path. There is no `_ext` stream.
@@ -30,7 +30,7 @@ Frigate restreams both on `minicore:8554` as `front_door` (Main stream) and `fro
 
 ## Keyframe stall and timestamps
 
-Measured 2026-09-27, in daylight with a mostly static scene. Scripts and raw JSON were in `/tmp/rtspprobe/` on agent-pc (temporary).
+Measured 2026-09-27, in daylight with a mostly static scene, before the keyframe change. Scripts and raw JSON were in `/tmp/rtspprobe/` on agent-pc (temporary).
 
 - Main stream keyframes are about 1 MB, which is 64–68% of all video bytes. P-frames are about 12 KB, and VBR sits at its 6144 kbps cap.
 - The Camera's RTSP sender pushes about 28 Mbps in total, shared by every session. With one session (Frigate's), a keyframe takes 0.22–0.37 s to arrive. The frames behind it queue and then burst. The worst lateness per GOP is about 0.28 s typical and 0.36 s max.
@@ -39,10 +39,16 @@ Measured 2026-09-27, in daylight with a mostly static scene. Scripts and raw JSO
 - The Sub stream stalls about the same, roughly 0.3 s, because its keyframes share the sender with the Main stream's.
 - UDP is only somewhat faster than TCP. The limit is the Camera's sender, not TCP and not the encoder.
 
-## Encoder settings (read-only, via ONVIF and Baichuan)
+**After the 2026-09-27 changes** (I-frame interval 1x on both streams, fixed frame rate on), measured through the Relay: the stall is 0.20–0.25 s, once per second.
 
-- Main stream: H.265 at 3840x2160 (also offers 2560x1440 and 2304x1296), 25 fps (range 2–25), 6144 kbps (4096–8192 at 4K), I-frame interval 2x fps (1x or 2x allowed). VBR only; there's no CBR on this model.
-- Sub stream: H.264 at 640x360 only, 10 fps (4/7/10/15), 256 kbps (64–512), I-frame interval 4x (1x–4x).
+## Encoder settings (via ONVIF and Baichuan)
+
+Changed 2026-09-27 with Chris's approval: fixed frame rate ON (Chris set it in the Reolink app), and I-frame interval 1x on both streams (set over Baichuan cmd 57). The phone and tablet Reolink app has no I-frame setting; only the desktop Client or Baichuan does. To change it: read cmd 56 (`GetEnc`), edit `mainStream/gop/cur` and `subStream/gop/cur` (1 = 1x fps), send the same XML as cmd 57, then read it back. `/tmp/rtspprobe/bc_set_gop.py` on agent-pc did this; it's temporary and may be gone. Setting it didn't touch the HTTP, HTTPS, or RTMP ports, and Frigate didn't restart.
+
+Values before the change:
+
+- Main stream: H.265 at 3840x2160 (also offers 2560x1440 and 2304x1296), 25 fps (range 2–25), 6144 kbps (4096–8192 at 4K), I-frame interval 2x fps (1x or 2x allowed; now 1x). VBR only; there's no CBR on this model.
+- Sub stream: H.264 at 640x360 only, 10 fps (4/7/10/15), 256 kbps (64–512), I-frame interval 4x (1x–4x; now 1x).
 - A third 896x512 stream exists, but not over RTSP (`_ext` returns 404).
 - Frigate's Reolink guidance recommends an I-frame interval of 1x and "fluency first" (fixed frame rate): https://docs.frigate.video/configuration/camera_specific/#reolink-cameras
 - **Caution:** `reolink_aio` can silently re-enable the Camera's HTTP, HTTPS, and RTMP ports when HTTP login fails. Use only raw Baichuan reads, or change settings in the Reolink app.
