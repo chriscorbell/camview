@@ -42,7 +42,9 @@ jobs:
           load: true
           tags: camview:ci
           cache-from: type=gha
-      # The Relay must serve the viewer and the WebRTC endpoint, and nothing else.
+      # The Relay must serve the viewer, WebRTC, and the Desk display's stream,
+      # and nothing else. Only configured streams may play: asking for any
+      # other source, or to re-point one, must fail.
       - name: Smoke test
         run: |
           docker run -d --name relay -p 8080:8080 \
@@ -52,6 +54,9 @@ jobs:
           code() { curl -s -o /dev/null -w '%{http_code}' -X "$1" "http://127.0.0.1:8080$2"; }
           test "$(code GET /)" = 200
           test "$(code POST /api/webrtc?src=feed)" != 404
+          for query in 'src=rtsp://127.0.0.1:1/x' 'src=ffmpeg:/etc/passwd' 'src=rtsp://127.0.0.1:1/x&name=feed'; do
+            test "$(code GET "/api/stream.mp4?$query")" = 404 || { echo "stream.mp4 accepted $query"; exit 1; }
+          done
           for path in /api /api/streams /api/config /api/ws /api/restart /stream.html; do
             test "$(code GET "$path")" = 404 || { echo "$path is exposed"; exit 1; }
           done

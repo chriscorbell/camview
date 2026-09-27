@@ -7,6 +7,12 @@ services:
       - "3147:8080"       # viewer page + WebRTC signaling
       - "8555:8555/tcp"   # WebRTC media
       - "8555:8555/udp"
+    # The GPU, for the Desk display's 1080p conversion. The group is the one that
+    # owns /dev/dri/renderD128 on the host (ls -n /dev/dri).
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - "991"
     environment:
       # Frigate's restream of the Camera, so camview never opens its own Camera session.
       MAIN_STREAM_URL: rtsp://10.0.0.20:8554/front_door
