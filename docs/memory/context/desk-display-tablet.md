@@ -20,6 +20,10 @@ Lenovo Tab M11 (TB330FU), MediaTek MT8786 (`mt6768`, Helio G88 class), Android 1
 - `KEY_LOW_LATENCY` is not supported and makes no measurable difference. MediaTek's `vdec-lowlatency` key saved about 1 ms on HEVC. The decoder never holds frames back.
 - The rendered-frame callback reports the frame's own timestamp, not the real display time, so time to screen can't be measured with it.
 
+## The installed app
+
+The release app `com.chriscorbell.camview` is installed from `desk-3` (2026-09-27). It is the default home activity (`cmd package set-home-activity com.chriscorbell.camview/com.chriscorbell.camview.MainActivity`), has `REQUEST_INSTALL_PACKAGES` granted with appops, and is its own installer of record, which is what allows silent self-updates. `adb install -i <pkg>` only takes effect once the package already exists, so install once and then reinstall with `-r -i com.chriscorbell.camview`. The Reolink app is also on the tablet; see the lesson on decoder contention.
+
 ## Access
 
 Wireless debugging is paired with agent-pc (2026-09-27). The connect port changes; find it with `sudo nmap -Pn -p 30000-49999 --min-rate 3000 10.0.0.173`, then run `adb connect 10.0.0.173:<port>`. Android turns wireless debugging off after reboots and Wi-Fi changes. The Android SDK is at `~/Android/Sdk` on agent-pc.
