@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>camview</title>
+  </head>
+  <body>
+    <main class="stage">
+      <video class="feed" autoplay muted playsinline disablepictureinpicture></video>
+      <p class="status" role="status" aria-live="polite"></p>
+      <div class="controls"></div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

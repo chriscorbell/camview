@@ -1,86 +1,44 @@
 # camview
 
-**camview** is a single-container live viewer for an RTSP IP camera that optimizes for low latency.
+A lightweight, low-latency live viewer for one RTSP security camera. Open it in a browser on your laptop or phone, or leave it running on an Android tablet.
 
-Open it in a browser and it auto-connects and shows the feed over WebRTC (with an automatic MSE fallback).
-
-Non-H.264 cameras are transcoded on the fly so any browser can play them (but you can optionally disable this).
-
-## Docker Compose
-
-Create a `compose.yaml` file: 
+The server is [go2rtc](https://github.com/AlexxIT/go2rtc) and nothing else. It passes the camera's video to each viewer over WebRTC without re-encoding it, and it serves the viewer page itself.
 
 ```
-services:
-  camview:
-    image: ghcr.io/chriscorbell/camview:latest
-    container_name: camview
-    restart: unless-stopped
-    ports:
-      - "3147:8080"        # web UI + signaling WebSocket
-      - "8555:8555/tcp"    # WebRTC media (only used if WEBRTC_CANDIDATE is set)
-      - "8555:8555/udp"    # WebRTC media (only used if WEBRTC_CANDIDATE is set)
-    environment:
-      CAMERA_RTSP_URL: ${CAMERA_RTSP_URL}
-      WEBRTC_CANDIDATE: ${WEBRTC_CANDIDATE:-}
-      TRANSCODE: ${TRANSCODE:-h264}
-      HWACCEL: ${HWACCEL:-}
+camera ──RTSP──▶ Frigate restream ──▶ camview (go2rtc) ──WebRTC──▶ browsers
 ```
 
-Create a `.env` file in the same directory as `compose.yaml` (see `.env.example` for more details):
+- **Browsers** get the camera's full-resolution Main stream untouched, including H.265 where the browser supports it (Chrome 136+, Safari 18+). A browser that can't play H.265 gets the Sub stream instead; go2rtc chooses per viewer.
+- **Audio** from the camera is AAC, which WebRTC can't carry, so ffmpeg converts only the audio to Opus. It runs only while someone is watching.
+- **Locked down**: the viewer page and the WebRTC endpoint are the only paths the server answers. go2rtc's own UI, config editor, and stream list are never registered. There is no login, so keep it on your LAN and reach it from outside over a VPN such as Tailscale.
 
-```
-CAMERA_RTSP_URL=rtsp://user:pass@192.168.1.50:554/stream1
-WEBRTC_CANDIDATE=192.168.1.10:8555
-TRANSCODE=h264
-# HWACCEL=vaapi
-```
+## Deploy
 
-### env vars
+[`compose.yaml`](compose.yaml) is the deployment. Set four variables:
 
-| Variable           | Default | Description                                                            |
-| ------------------ | ------- | ---------------------------------------------------------------------- |
-| `CAMERA_RTSP_URL`  | —       | **Required.** Full RTSP URL incl. credentials.                        |
-| `WEBRTC_CANDIDATE` | —       | `"<server-lan-ip>:8555"` for true WebRTC; unset falls back to MSE.    |
-| `TRANSCODE`        | `h264`  | `off` to pass the feed through (use with a native H.264 sub-stream).   |
-| `HWACCEL`          | —       | GPU offload for the transcode: `vaapi` (Intel/AMD, incl. QuickSync) or `cuda` (NVIDIA). |
+| Variable | Example | What it is |
+| --- | --- | --- |
+| `MAIN_STREAM_URL` | `rtsp://10.0.0.20:8554/front_door` | The camera's full-resolution stream |
+| `SUB_STREAM_URL` | `rtsp://10.0.0.20:8554/front_door_sub` | Its low-resolution stream, for viewers that can't play the main one |
+| `LAN_ADDRESS` | `10.0.0.20` | The server's LAN address, advertised to viewers for WebRTC |
+| `TAILSCALE_ADDRESS` | `100.88.0.15` | The server's Tailscale address, so WebRTC also works away from home |
 
-Notes:
-- **WebRTC vs MSE:** with bridge networking the container can't auto-detect a browser-reachable IP, so WebRTC needs `WEBRTC_CANDIDATE`. Without it, the player uses MSE over port 8080 — fine for most camera viewing, but higher latency than WebRTC
-- **Hardware transcode:** set `HWACCEL` *and* pass the GPU through in `compose.yaml` (see the comments in `dev.compose.yaml`). go2rtc ignores values it doesn't recognize, so anything else quietly runs on the CPU
-- Find your RTSP URL in the camera's app/manual; test it with `ffprobe "<url>"`
-- LAN-only, no auth. **Don't expose to the internet**, use a VPN for remote access
+Point the stream URLs at a restream (Frigate or go2rtc) if something else already reads the camera. Many cameras allow very few full-resolution sessions, and each extra one can slow the rest. A URL with credentials works too (`rtsp://user:pass@host/...`).
 
-## Tech stack & development
+Then `docker compose up -d` and open `http://<server>:3147`.
 
-```
-browser ──HTTP/WS :8080──▶ nginx ──▶ go2rtc :1984 (signaling)
-   ▲                                     │
-   └─────────── WebRTC media :8555 ◀─────┘  ◀── RTSP from camera
-```
-
-- **[go2rtc](https://github.com/AlexxIT/go2rtc)** — pulls the RTSP stream and serves it as WebRTC/MSE; runs the on-demand ffmpeg H.264 transcode
-- **nginx** — serves the static UI and reverse-proxies the signaling WebSocket, so everything is on one port
-- **Vite + React + TypeScript** — the frontend lives in `src/` and builds to static assets
-- **`src/vendor/video-rtc.js`** — go2rtc's vendored browser player, with local TypeScript declarations in `src/vendor/video-rtc.d.ts`
-- **`entrypoint.sh`** — generates the `camera` stream config from the env vars at startup (kept in a file so go2rtc expands *and* masks the credentialed URL), then runs go2rtc + nginx
-
-Everything lives in one image; `go2rtc.yaml` holds only static base settings.
+## Develop
 
 ```sh
-npm install
-npm run dev                       # Vite dev server
-npm run build                     # type-check + production frontend build
-docker build -t camview .          # build locally
-docker compose up -d --build       # or via compose (uncomment `build:` first)
+cd web
+pnpm install
+CAMVIEW_RELAY=http://10.0.0.20:3147 pnpm dev   # viewer against a running server
+pnpm build                                      # type-check and build
+docker build -t camview .                       # the whole image, from the repo root
 ```
 
-For local UI development, Vite proxies `/api` WebSocket traffic to go2rtc. By default it targets `http://127.0.0.1:1984`; override it when developing against a running camview container:
+The viewer is plain TypeScript built with Vite, with no framework. The server config is [`relay/go2rtc.yaml`](relay/go2rtc.yaml).
 
-```sh
-VITE_GO2RTC_ORIGIN=http://127.0.0.1:8080 npm run dev
-```
+Every push to `main` publishes `ghcr.io/chriscorbell/camview:latest` and `:sha-<commit>`.
 
-The Docker build compiles the Vite app in a Node stage, then copies `dist/` into the final go2rtc/nginx image.
-
-CI (`.github/workflows/docker-publish.yml`) builds a multi-arch image (amd64 + arm64) and pushes the image to GHCR
+Background: the vocabulary is in [`CONTEXT.md`](CONTEXT.md), decisions are in [`docs/adr/`](docs/adr/), and what's been learned about the camera and hardware is in [`docs/memory/`](docs/memory/README.md).
