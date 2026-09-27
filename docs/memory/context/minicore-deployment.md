@@ -4,15 +4,16 @@ Read when: deploying, updating, or checking the running camview, changing its po
 Status: verified
 Scope: environment (production host `minicore`)
 Verified: 2026-09-27
-Source: read-only inspection of minicore on 2026-09-27. Raw output was not kept; this note summarizes it. General minicore facts (IPs, hardware, where stacks and data live) belong to the fleet inventory, `chriscorbell/fleet` `AGENTS.md` (locally `~/Code/fleet/AGENTS.md`).
+Source: inspection of minicore and the cutover on 2026-09-27. Raw output was not kept; this note summarizes it. General minicore facts (IPs, hardware, where stacks and data live) belong to the fleet inventory, `chriscorbell/fleet` `AGENTS.md` (locally `~/Code/fleet/AGENTS.md`).
 Recheck when: the rebuild or any later change alters the image, compose file, env file, ports, network, exposure, or the host's GPU or drivers.
 
 ## Container
 
-- Runs as container `camview` from `ghcr.io/chriscorbell/camview:latest`.
-- Compose file: `/home/chris/docker/stacks/camview/compose.yaml`.
-- Env file: `/home/chris/docker/data/camview/.env`, holding `CAMERA_RTSP_URL` and `WEBRTC_CANDIDATE`. It contains credentials: read single keys when needed and never copy values into the repo or memory.
-- Bridge network. Published ports: 3147 (UI) and 8555 TCP and UDP (WebRTC).
+- Runs as container `camview` from `ghcr.io/chriscorbell/camview:latest` (the go2rtc-only Relay since 2026-09-27, PR #3). Watchtower on minicore polls GHCR every 60 s and recreates it when `:latest` moves, reusing the running container's config, not the compose file. Change env on the running container (compose `up -d`) before merging anything that needs new env.
+- Compose file: `/home/chris/docker/stacks/camview/compose.yaml`, matching the repo's `compose.yaml`. The config is inline env with no secrets: Frigate's restream needs no credentials. The pre-rebuild compose is kept as `compose.yaml.bak-2026-09-27` next to it.
+- `/home/chris/docker/data/camview/.env` is no longer used. It still holds the old `CAMERA_RTSP_URL` with Camera credentials; never copy its values anywhere.
+- `/dev/dri` is passed through with `group_add: "991"` (render), for the `desk` stream's VAAPI conversion. It was added to the running container before the Desk display PR (#4) merged.
+- Bridge network. Published ports: 3147→8080 (viewer and signaling) and 8555 TCP and UDP (WebRTC). WebRTC candidates are `10.0.0.20:8555` and `100.88.0.15:8555`, both verified end to end on 2026-09-27; the Tailscale path was forced by stripping the LAN candidate.
 
 ## Exposure
 

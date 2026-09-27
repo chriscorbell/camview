@@ -1,0 +1,34 @@
+diff --git a/internal/streams/streams.go b/internal/streams/streams.go
+index f3b8df0..a11ecbb 100644
+--- a/internal/streams/streams.go
++++ b/internal/streams/streams.go
+@@ -116,24 +116,13 @@ func Patch(name string, source string) (*Stream, error) {
+ }
+ 
+ func GetOrPatch(query url.Values) (*Stream, error) {
+-	// check if src param exists
+-	source := query.Get("src")
+-	if source == "" {
+-		return nil, errors.New("streams: source empty")
+-	}
+-
+-	// check if src is stream name
+-	if stream := Get(source); stream != nil {
++	// camview: serve only the streams in the config. Upstream also creates or
++	// re-points streams from ?src= and ?name=, which would let anyone who can
++	// reach the viewer add sources or swap what the Camera stream plays.
++	if stream := Get(query.Get("src")); stream != nil {
+ 		return stream, nil
+ 	}
+-
+-	// check if name param provided
+-	if name := query.Get("name"); name != "" {
+-		return Patch(name, source)
+-	}
+-
+-	// return new stream with src as name
+-	return Patch(source, source)
++	return nil, errors.New("streams: unknown stream")
+ }
+ 
+ var log zerolog.Logger
