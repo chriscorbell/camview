@@ -1,12 +1,15 @@
-# Every push to main ships: CI publishes ghcr.io/chriscorbell/camview:latest,
-# and Watchtower on minicore picks it up within about a minute. Roll back by
-# pinning a :sha-<commit> tag in the compose file.
+# Every push to main that changes the image ships: CI publishes
+# ghcr.io/chriscorbell/camview:latest, and Watchtower on minicore picks it up
+# within about a minute. Pushes that only touch docs, memory, or the Android app
+# publish nothing, because every publish restarts the Relay and drops every
+# Viewer for a moment. Roll back by pinning a :sha-<commit> tag in the compose file.
 name: CI
 
 on:
   pull_request:
   push:
     branches: [main]
+    paths: [relay/**, web/**, Dockerfile, .dockerignore, .github/workflows/ci.yml]
 
 permissions:
   contents: read
