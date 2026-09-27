@@ -37,5 +37,13 @@
         <receiver
             android:name=".Updater$InstallResult"
             android:exported="false" />
+
+        <receiver
+            android:name=".StayInFront$AfterUpdate"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>
