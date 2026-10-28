@@ -27,7 +27,7 @@ camera ──RTSP──▶ Frigate restream ──▶ camview (go2rtc) ──Web
 
 Point the stream URLs at a restream (Frigate or go2rtc) if something else already reads the camera. Many cameras allow very few full-resolution sessions, and each extra one can slow the rest. A URL with credentials works too (`rtsp://user:pass@host/...`).
 
-The app's 1080p stream needs a VAAPI GPU passed through (`devices` and `group_add` in the compose file). The image ships the AMD driver.
+The app's 1080p stream needs a VAAPI GPU passed through (`devices` and `group_add` in the compose file). The image ships the AMD and Intel drivers.
 
 Then `docker compose up -d` and open `http://<server>:3147`.
 
