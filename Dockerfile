@@ -16,10 +16,11 @@ COPY relay/serve-configured-streams-only.patch ./
 RUN patch -p1 < serve-configured-streams-only.patch \
     && CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /go2rtc .
 
-# The Relay: go2rtc alone, plus ffmpeg and the AMD VAAPI driver for the
-# audio conversion and the Desk display's 1080p conversion.
+# The Relay: go2rtc alone, plus ffmpeg and the AMD and Intel VAAPI drivers for
+# the audio conversion and the Desk display's 1080p conversion. libva loads the
+# one that matches the host's GPU.
 FROM alpine:3.23
-RUN apk add --no-cache ffmpeg mesa-va-gallium tini \
+RUN apk add --no-cache ffmpeg mesa-va-gallium intel-media-driver tini \
     && adduser -S -D -H camview
 COPY --from=go2rtc /go2rtc /usr/local/bin/go2rtc
 COPY relay/go2rtc.yaml /etc/camview/go2rtc.yaml

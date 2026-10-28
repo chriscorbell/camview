@@ -22,4 +22,4 @@ Reachable only on the LAN (`192.168.1.20`) and over Tailscale (`100.64.0.20`, `s
 
 ## GPU
 
-Radeon 780M at `/dev/dri/renderD128`, render group gid 991. VAAPI works through Mesa radeonsi, with H.264, HEVC, and AV1 encode and decode. A container that transcodes on the GPU needs that device passed through, plus gid 991 as a supplementary group when it runs as a non-root user.
+Radeon 780M at `/dev/dri/renderD128`, render group gid 991. VAAPI works through Mesa radeonsi, with H.264, HEVC, and AV1 encode and decode. A container that transcodes on the GPU needs that device passed through, plus gid 991 as a supplementary group when it runs as a non-root user. Since 2026-10-27 the image also ships Intel's iHD driver, verified on a UHD 770, so the Relay keeps its GPU conversion if the host moves to an Intel iGPU.
