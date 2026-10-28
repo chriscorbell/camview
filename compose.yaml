@@ -15,6 +15,7 @@ services:
       - "991"
     environment:
       # Frigate's restream of the Camera, so camview never opens its own Camera session.
+      # The addresses below are examples; use your own.
       MAIN_STREAM_URL: rtsp://192.168.1.20:8554/front_door
       SUB_STREAM_URL: rtsp://192.168.1.20:8554/front_door_sub
       # The host's addresses, advertised to Viewers for WebRTC.

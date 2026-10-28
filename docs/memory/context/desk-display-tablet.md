@@ -4,12 +4,12 @@ Read when: choosing what resolution or codec the Desk display receives, writing 
 Status: verified
 Scope: environment (the Desk display)
 Verified: 2026-09-27
-Source: adb inspection plus a throwaway MediaCodec benchmark app run on the tablet on 2026-09-27. Evidence lived in `/tmp/decodebench` on the workstation (temporary; may be gone). Re-run a decode test to reproduce.
+Source: adb inspection plus a throwaway MediaCodec benchmark app run on the tablet on 2026-09-27. Evidence lived in a temporary directory and may be gone. Re-run a decode test to reproduce.
 Recheck when: the tablet is replaced, or gets a major Android or vendor firmware update.
 
 ## Device
 
-Lenovo Tab M11 (TB330FU), MediaTek MT8786 (`mt6768`, Helio G88 class), Android 15 (SDK 35), 1920x1200 IPS LCD at 90 Hz, 4 GB RAM. LAN `192.168.1.173`, not on the tailnet. Its Android System WebView and Chrome were 127, too old for H.265 over WebRTC.
+Lenovo Tab M11 (TB330FU), MediaTek MT8786 (`mt6768`, Helio G88 class), Android 15 (SDK 35), 1920x1200 IPS LCD at 90 Hz, 4 GB RAM. LAN only, not on Tailscale. Its Android System WebView and Chrome were 127, too old for H.265 over WebRTC.
 
 ## Decode limits
 
@@ -22,8 +22,10 @@ Lenovo Tab M11 (TB330FU), MediaTek MT8786 (`mt6768`, Helio G88 class), Android 1
 
 ## The installed app
 
+As of 2026-09-27. Since 2026-10-17 the tablet runs a LineageOS build with a different home app, so this section may be out of date; Chris's private notes have its current state.
+
 The release app `com.chriscorbell.camview` is installed from `desk-3` (2026-09-27). It is the default home activity (`cmd package set-home-activity com.chriscorbell.camview/com.chriscorbell.camview.MainActivity`), has `REQUEST_INSTALL_PACKAGES` granted with appops, and is its own installer of record, which is what allows silent self-updates. `adb install -i <pkg>` only takes effect once the package already exists, so install once and then reinstall with `-r -i com.chriscorbell.camview`. The Lenovo freeform bar is off (`settings put system enable_temp_zuifreeformbar 0`). The Reolink app is also on the tablet; see the lesson on decoder contention. Self-update is verified end to end (desk-3 → 5 → 7), with no tap needed, and the Feed reopens after each update.
 
 ## Access
 
-Wireless debugging is paired with the workstation (2026-09-27). The connect port changes; find it with `sudo nmap -Pn -p 30000-49999 --min-rate 3000 192.168.1.173`, then run `adb connect 192.168.1.173:<port>`. Android turns wireless debugging off after reboots and Wi-Fi changes. The Android SDK is at `~/Android/Sdk` on the workstation.
+The tablet's address and how ADB reaches it are in Chris's private notes. As of 2026-09-27, on stock Android, wireless debugging's connect port changed each time (find it with `sudo nmap -Pn -p 30000-49999 --min-rate 3000 <tablet>`, then `adb connect <tablet>:<port>`), and Android turned wireless debugging off after reboots and Wi-Fi changes.

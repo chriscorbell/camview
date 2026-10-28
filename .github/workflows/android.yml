@@ -59,7 +59,11 @@ jobs:
           CAMVIEW_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.CAMVIEW_ANDROID_KEYSTORE_PASSWORD }}
           CAMVIEW_ANDROID_KEY_ALIAS: ${{ secrets.CAMVIEW_ANDROID_KEY_ALIAS }}
           CAMVIEW_ANDROID_KEY_PASSWORD: ${{ secrets.CAMVIEW_ANDROID_KEY_PASSWORD }}
+          # The Relay's address, kept out of this public repo. A release without
+          # it would point the Desk display at nothing.
+          CAMVIEW_RELAY_URL: ${{ secrets.CAMVIEW_RELAY_URL }}
         run: |
+          test -n "$CAMVIEW_RELAY_URL" || { echo "The CAMVIEW_RELAY_URL secret is not set"; exit 1; }
           export CAMVIEW_ANDROID_KEYSTORE="$RUNNER_TEMP/release.jks"
           echo "$KEYSTORE_BASE64" | base64 -d > "$CAMVIEW_ANDROID_KEYSTORE"
           ./gradlew --no-daemon assembleRelease

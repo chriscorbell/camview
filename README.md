@@ -43,14 +43,14 @@ adb install -r -i com.chriscorbell.camview camview-desk.apk   # makes the app it
 adb shell settings put system enable_temp_zuifreeformbar 0     # Lenovo only: hides the multi-window handle drawn over the top
 ```
 
-From then on the app checks GitHub Releases every 15 minutes, updates itself, and reopens the feed. The server address is set in [`android/app/build.gradle.kts`](android/app/build.gradle.kts).
+From then on the app checks GitHub Releases every 15 minutes, updates itself, and reopens the feed. The release workflow builds in the server's address from the `CAMVIEW_RELAY_URL` repository secret, such as `http://192.168.1.20:3147`.
 
 ## Develop
 
 ```sh
 cd web
 pnpm install
-CAMVIEW_RELAY=http://192.168.1.20:3147 pnpm dev   # viewer against a running server
+CAMVIEW_RELAY=http://<server>:3147 pnpm dev    # viewer against a running server
 pnpm build                                      # type-check and build
 docker build -t camview .                       # the whole image, from the repo root
 ```
@@ -59,9 +59,10 @@ The viewer is plain TypeScript built with Vite, with no framework. The server co
 
 ```sh
 cd android
-./gradlew assembleDebug                                              # installs beside the release app as .debug
-CAMVIEW_DEBUG_RELAY=http://192.168.1.20:3147 ./gradlew assembleDebug    # point a debug build at another server
+CAMVIEW_RELAY_URL=http://<server>:3147 ./gradlew assembleDebug    # installs beside the release app as .debug
 ```
+
+Without `CAMVIEW_RELAY_URL`, the app points at a placeholder that reaches nothing. `CAMVIEW_DEBUG_RELAY` overrides it for debug builds only.
 
 Every push to `main` publishes `ghcr.io/chriscorbell/camview:latest` and `:sha-<commit>`.
 
