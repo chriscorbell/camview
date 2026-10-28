@@ -22,9 +22,13 @@ streams:
     - ffmpeg:feed#audio=opus
 
   # The Desk display can't decode 4K, so it gets the Main stream scaled to
-  # 1080p on the GPU, with the Camera's own audio alongside.
+  # 1080p on the GPU, with the Camera's own audio alongside. query=audio makes
+  # ffmpeg's input ask for the audio too (ffmpeg drops it), so the Main stream's
+  # connection sets up both tracks before it plays. Otherwise the first audio
+  # consumer makes go2rtc reconnect to add the track, and ffmpeg's decoder gets
+  # the new session's frames spliced onto the old one's, which hangs Intel GPUs.
   desk:
-    - ffmpeg:feed#input=desk/input#video=desk/h264
+    - ffmpeg:feed#input=desk/input#video=desk/h264#query=audio
     - rtsp://127.0.0.1:8554/feed?audio
 
 ffmpeg:
