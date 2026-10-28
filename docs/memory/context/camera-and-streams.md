@@ -2,14 +2,14 @@
 
 Read when: choosing which Camera stream camview pulls, deciding whether to transcode, planning how many connections camview may open, or debugging codec, resolution, latency, or connection-limit problems.
 Status: verified
-Scope: environment (the Camera, and Frigate on minicore)
+Scope: environment (the Camera, and Frigate on the server)
 Verified: 2026-09-27
-Source: read-only inspection of the Camera and minicore on 2026-09-27. Raw output was not kept; this note summarizes it. The checks below reproduce the stream and port facts and locate Frigate's configuration.
+Source: read-only inspection of the Camera and the server on 2026-09-27. Raw output was not kept; this note summarizes it. The checks below reproduce the stream and port facts. This repo is public, so addresses, host names and file paths are kept in Chris's private infrastructure notes, not here.
 Recheck when: the Camera's settings or firmware change, or Frigate's configuration changes.
 
 ## Camera
 
-Reolink RLC-820A at `10.0.0.200`, firmware v3.1.0.5223_2508072063. Only ports 554 (RTSP), 8000 (ONVIF), and 9000 are open. The HTTP web UI and API are disabled, so nothing can be read or configured over HTTP.
+Reolink RLC-820A on the LAN, firmware v3.1.0.5223_2508072063. Only ports 554 (RTSP), 8000 (ONVIF), and 9000 are open. The HTTP web UI and API are disabled, so nothing can be read or configured over HTTP.
 
 ## Streams
 
@@ -24,13 +24,13 @@ The Main stream path says `h264` but carries HEVC; judge the codec from a probe,
 
 ## Session limit and Frigate
 
-The Camera allows 12 simultaneous stream sessions: 10 Sub stream and 2 Main stream. Frigate 0.18 on minicore permanently holds one Main stream and one Sub stream session, so at most one more Main stream session and nine more Sub stream sessions are available to camview directly.
+The Camera allows 12 simultaneous stream sessions: 10 Sub stream and 2 Main stream. Frigate 0.18 on the server permanently holds one Main stream and one Sub stream session, so at most one more Main stream session and nine more Sub stream sessions are available to camview directly.
 
-Frigate restreams both on `minicore:8554` as `front_door` (Main stream) and `front_door_sub` (Sub stream). Both are plain passthroughs with audio intact, and the restream has no authentication. Frigate's own recorder reads the restream, so Frigate holds exactly those two Camera sessions. Reading the restream instead of the Camera added no measurable latency (go2rtc on both sides: median −2 ms, mean +1 ms; 2026-09-27). The trade-off is that the restream drops whenever Frigate restarts; it tracks `:stable` under Watchtower. It records motion clips for 14 days to `/nas/media/reolink`.
+Frigate restreams both on the server's port 8554 as `front_door` (Main stream) and `front_door_sub` (Sub stream). Both are plain passthroughs with audio intact, and the restream has no authentication. Frigate's own recorder reads the restream, so Frigate holds exactly those two Camera sessions. Reading the restream instead of the Camera added no measurable latency (go2rtc on both sides: median −2 ms, mean +1 ms; 2026-09-27). The trade-off is that the restream drops whenever Frigate restarts; it tracks `:stable` under Watchtower. It records motion clips for 14 days to network storage.
 
 ## Keyframe stall and timestamps
 
-Measured 2026-09-27, in daylight with a mostly static scene, before the keyframe change. Scripts and raw JSON were in `/tmp/rtspprobe/` on agent-pc (temporary).
+Measured 2026-09-27, in daylight with a mostly static scene, before the keyframe change. Scripts and raw JSON were in a temporary directory and may be gone.
 
 - Main stream keyframes are about 1 MB, which is 64–68% of all video bytes. P-frames are about 12 KB, and VBR sits at its 6144 kbps cap.
 - The Camera's RTSP sender pushes about 28 Mbps in total, shared by every session. With one session (Frigate's), a keyframe takes 0.22–0.37 s to arrive. The frames behind it queue and then burst. The worst lateness per GOP is about 0.28 s typical and 0.36 s max.
@@ -43,7 +43,7 @@ Measured 2026-09-27, in daylight with a mostly static scene, before the keyframe
 
 ## Encoder settings (via ONVIF and Baichuan)
 
-Changed 2026-09-27 with Chris's approval: fixed frame rate ON (Chris set it in the Reolink app), and I-frame interval 1x on both streams (set over Baichuan cmd 57). The phone and tablet Reolink app has no I-frame setting; only the desktop Client or Baichuan does. To change it: read cmd 56 (`GetEnc`), edit `mainStream/gop/cur` and `subStream/gop/cur` (1 = 1x fps), send the same XML as cmd 57, then read it back. `/tmp/rtspprobe/bc_set_gop.py` on agent-pc did this; it's temporary and may be gone. Setting it didn't touch the HTTP, HTTPS, or RTMP ports, and Frigate didn't restart.
+Changed 2026-09-27 with Chris's approval: fixed frame rate ON (Chris set it in the Reolink app), and I-frame interval 1x on both streams (set over Baichuan cmd 57). The phone and tablet Reolink app has no I-frame setting; only the desktop Client or Baichuan does. To change it: read cmd 56 (`GetEnc`), edit `mainStream/gop/cur` and `subStream/gop/cur` (1 = 1x fps), send the same XML as cmd 57, then read it back. A temporary script, `bc_set_gop.py`, did this; it may be gone. Setting it didn't touch the HTTP, HTTPS, or RTMP ports, and Frigate didn't restart.
 
 Values before the change:
 
@@ -55,8 +55,8 @@ Values before the change:
 
 ## Checks
 
-Never write credentials into memory; use `<user>:<pass>` placeholders in anything you save. The Camera's user is `admin`. Its password lives only in Frigate's container environment as `FRIGATE_RTSP_PASSWORD` on minicore; pipe it where it's needed (for example `ssh minicore 'docker exec frigate printenv FRIGATE_RTSP_PASSWORD'`) and never print it.
+Never write credentials into memory; use `<user>:<pass>` placeholders in anything you save. The Camera's user is `admin`. Its password lives only in Frigate's container environment as `FRIGATE_RTSP_PASSWORD` on the server; pipe it where it's needed (for example from `docker exec frigate printenv FRIGATE_RTSP_PASSWORD` there) and never print it.
 
-- Codec, resolution, frame rate, audio: `ffprobe -v error -rtsp_transport tcp -show_streams "rtsp://<user>:<pass>@10.0.0.200:554/h264Preview_01_main"`, and the same for `h264Preview_01_sub`.
-- Open ports: `nmap -Pn -p- 10.0.0.200`.
-- Frigate: its compose file is `/home/chris/docker/stacks/frigate/compose.yaml` and its config is `/home/chris/docker/data/frigate/config/config.yml` on minicore.
+- Codec, resolution, frame rate, audio: `ffprobe -v error -rtsp_transport tcp -show_streams "rtsp://<user>:<pass>@<camera>:554/h264Preview_01_main"`, and the same for `h264Preview_01_sub`.
+- Open ports: `nmap -Pn -p- <camera>`.
+- Frigate: its compose file and config are on the server; the private notes say where.

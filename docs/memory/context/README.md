@@ -10,4 +10,4 @@ Threshold: 12 entries. Past it, the bounded review in [maintenance](../maintenan
 
 - [Camera and its streams](camera-and-streams.md): read when choosing a Camera stream, deciding on transcoding, counting connections against the Camera's session limit, or using Frigate's restream.
 - [Desk display tablet](desk-display-tablet.md): read when choosing what the Desk display receives, building or debugging its native player, installing builds over adb, or when tablet video goes black.
-- [Deployment on minicore](minicore-deployment.md): read when deploying or checking the running camview, changing its ports, network, env, or exposure, or planning GPU transcoding.
+- [Deployment](deployment.md): read when deploying or checking the running camview, changing its ports, network, env, or exposure, or planning GPU transcoding.

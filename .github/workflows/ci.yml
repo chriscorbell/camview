@@ -1,5 +1,5 @@
 # Every push to main that changes the image ships: CI publishes
-# ghcr.io/chriscorbell/camview:latest, and Watchtower on minicore picks it up
+# ghcr.io/chriscorbell/camview:latest, and Watchtower on the server picks it up
 # within about a minute. Pushes that only touch docs, memory, or the Android app
 # publish nothing, because every publish restarts the Relay and drops every
 # Viewer for a moment. Roll back by pinning a :sha-<commit> tag in the compose file.
