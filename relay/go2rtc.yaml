@@ -22,7 +22,9 @@ streams:
     - ffmpeg:feed#audio=opus
 
   # The Desk display can't decode 4K, so it gets the Main stream scaled to
-  # 1080p on the GPU, with the Camera's own audio alongside.
+  # 1080p, with the Camera's own audio alongside. ffmpeg decodes the HEVC on
+  # the CPU, then scales and encodes on the GPU: decoding it on an Intel GPU
+  # made the driver reset the video engine again and again after each start.
   desk:
     - ffmpeg:feed#input=desk/input#video=desk/h264
     - rtsp://127.0.0.1:8554/feed?audio
@@ -30,7 +32,6 @@ streams:
 ffmpeg:
   desk/input: >-
     -init_hw_device vaapi=gpu:/dev/dri/renderD128 -filter_hw_device gpu
-    -hwaccel vaapi -hwaccel_device gpu -hwaccel_output_format vaapi -hwaccel_flags allow_profile_mismatch
     -fflags nobuffer -flags low_delay -timeout {timeout} -user_agent go2rtc/ffmpeg
     -rtsp_flags prefer_tcp -i {input}
   # The Camera stamps frames when it sends them, so the timestamps bunch up
